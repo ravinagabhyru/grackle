@@ -271,6 +271,27 @@ See [`config.toml.example`](config.toml.example) for the full annotated template
 
 waystt supports four transcription providers: **Parakeet** (local ONNX, default), **OpenAI Whisper**, **Google Speech-to-Text**, and **local Whisper** (whisper-rs).
 
+### Parakeet / Nemotron ONNX
+
+Parakeet runs locally through `parakeet-rs`. Configure it under `[parakeet]`:
+
+```toml
+transcription_provider = "parakeet"
+
+[parakeet]
+model_type = "ctc"        # "ctc", "tdt", "eou", or "nemotron"
+# model_path = "/path/to/model"
+```
+
+Default model directories follow `~/.local/share/applications/waystt/parakeet/{model_type}/`.
+
+- `ctc`: English batch / one-shot transcription.
+- `tdt`: multilingual batch / one-shot transcription.
+- `eou`: English streaming with model end-of-utterance detection.
+- `nemotron`: experimental English streaming backend. Continuous mode feeds 560 ms chunks and waystt finalizes utterances on its existing silence detector. One-shot transcription uses `Nemotron::transcribe_audio()`.
+
+Nemotron requires the ONNX layout from `altunenes/parakeet-rs`, not NVIDIA's `.nemo` repository layout. Put these files in `~/.local/share/applications/waystt/parakeet/nemotron/` or set `[parakeet].model_path`: `encoder.onnx`, `encoder.onnx.data`, `decoder_joint.onnx`, `tokenizer.model`.
+
 ### OpenAI Whisper
 
 OpenAI Whisper offers excellent accuracy and supports automatic language detection.

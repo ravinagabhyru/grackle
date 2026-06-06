@@ -113,8 +113,7 @@ pub fn try_build(config: &Config) -> Result<Option<Arc<dyn TextRefiner>>, Refine
     #[cfg(not(feature = "llm-refine"))]
     {
         Err(RefineError::Configuration(
-            "LLM_REFINE_ENABLED=true but binary was built without the `llm-refine` feature"
-                .into(),
+            "LLM_REFINE_ENABLED=true but binary was built without the `llm-refine` feature".into(),
         ))
     }
 }
@@ -160,12 +159,34 @@ pub async fn refine_or_fallback(
         }
         Err(e) => {
             let elapsed_ms = started.elapsed().as_millis();
-            eprintln!(
-                "[Refine/{scope}] {e} after {elapsed_ms} ms; emitting original transcript"
-            );
+            eprintln!("[Refine/{scope}] {e} after {elapsed_ms} ms; emitting original transcript");
             text
         }
     }
+}
+
+/// Add a final sentence terminator when an ASR backend returns a complete
+/// utterance without one.
+pub fn ensure_terminal_sentence_punctuation(text: String) -> String {
+    let mut text = text.trim_end().to_string();
+    if text.is_empty() {
+        return text;
+    }
+
+    let mut insert_at = text.len();
+    for (idx, ch) in text.char_indices().rev() {
+        if matches!(ch, '"' | '\'' | ')' | ']' | '}') {
+            insert_at = idx;
+            continue;
+        }
+        if matches!(ch, '.' | '!' | '?') {
+            return text;
+        }
+        text.insert(insert_at, '.');
+        return text;
+    }
+
+    text
 }
 
 #[cfg(test)]
@@ -193,8 +214,7 @@ mod tests {
 
     #[tokio::test]
     async fn returns_original_when_no_refiner() {
-        let out =
-            refine_or_fallback(None, "hello".into(), 0, RefineScope::Batch, false).await;
+        let out = refine_or_fallback(None, "hello".into(), 0, RefineScope::Batch, false).await;
         assert_eq!(out, "hello");
     }
 
@@ -203,8 +223,7 @@ mod tests {
         let stub: Arc<dyn TextRefiner> = Arc::new(StubRefiner {
             reply: "never".into(),
         });
-        let out =
-            refine_or_fallback(Some(&stub), "   ".into(), 0, RefineScope::Batch, false).await;
+        let out = refine_or_fallback(Some(&stub), "   ".into(), 0, RefineScope::Batch, false).await;
         assert_eq!(out, "   ");
     }
 
@@ -213,8 +232,7 @@ mod tests {
         let stub: Arc<dyn TextRefiner> = Arc::new(StubRefiner {
             reply: "never".into(),
         });
-        let out =
-            refine_or_fallback(Some(&stub), "hi".into(), 10, RefineScope::Batch, false).await;
+        let out = refine_or_fallback(Some(&stub), "hi".into(), 10, RefineScope::Batch, false).await;
         assert_eq!(out, "hi");
     }
 
@@ -263,6 +281,34 @@ mod tests {
         )
         .await;
         assert_eq!(out, "keep original");
+    }
+
+    #[test]
+    fn ensure_terminal_sentence_punctuation_adds_missing_period() {
+        let out = ensure_terminal_sentence_punctuation("hello world  ".into());
+        assert_eq!(out, "hello world.");
+    }
+
+    #[test]
+    fn ensure_terminal_sentence_punctuation_preserves_existing_terminal_mark() {
+        assert_eq!(
+            ensure_terminal_sentence_punctuation("hello world?".into()),
+            "hello world?"
+        );
+        assert_eq!(
+            ensure_terminal_sentence_punctuation("hello world!".into()),
+            "hello world!"
+        );
+        assert_eq!(
+            ensure_terminal_sentence_punctuation("hello world.".into()),
+            "hello world."
+        );
+    }
+
+    #[test]
+    fn ensure_terminal_sentence_punctuation_handles_trailing_quote() {
+        let out = ensure_terminal_sentence_punctuation("\"hello world\"".into());
+        assert_eq!(out, "\"hello world.\"");
     }
 
     #[test]

@@ -14,6 +14,8 @@ pub enum ParakeetModelType {
     /// EOU model - English only, streaming with end-of-utterance detection
     /// (used only by the streaming path — see `parakeet_streaming.rs`).
     EOU,
+    /// Nemotron model - English only, experimental streaming backend.
+    Nemotron,
 }
 
 impl ParakeetModelType {
@@ -22,10 +24,28 @@ impl ParakeetModelType {
         match s.to_lowercase().as_str() {
             "tdt" => Self::TDT,
             "eou" => Self::EOU,
+            "nemotron" => Self::Nemotron,
             _ => Self::CTC,
         }
     }
+
+    #[must_use]
+    pub fn supports_batch(self) -> bool {
+        self != Self::EOU
+    }
+
+    #[must_use]
+    pub fn supports_streaming(self) -> bool {
+        matches!(self, Self::EOU | Self::Nemotron)
+    }
 }
+
+pub const NEMOTRON_REQUIRED_FILES: &[&str] = &[
+    "encoder.onnx",
+    "encoder.onnx.data",
+    "decoder_joint.onnx",
+    "tokenizer.model",
+];
 
 /// Loaded ONNX model, held across transcription calls. `ort::Session` (inside
 /// both variants) is `Send + Sync`, but `transcribe_samples` takes `&mut self`,
@@ -38,6 +58,7 @@ impl ParakeetModelType {
 enum CachedModel {
     Ctc(Box<parakeet_rs::Parakeet>),
     Tdt(Box<parakeet_rs::ParakeetTDT>),
+    Nemotron(Box<parakeet_rs::Nemotron>),
 }
 
 /// Parakeet transcription provider using NVIDIA Parakeet models via ONNX Runtime
@@ -72,6 +93,9 @@ impl ParakeetProvider {
                 "Parakeet model directory not found: {}",
                 model_path.display()
             )));
+        }
+        if model_type == ParakeetModelType::Nemotron {
+            validate_nemotron_model_dir(model_path)?;
         }
 
         Ok(Self {
@@ -110,7 +134,7 @@ impl ParakeetProvider {
     ///
     /// Returns an error if the model files cannot be loaded.
     pub fn warm_up(&self) -> Result<(), TranscriptionError> {
-        if self.model_type == ParakeetModelType::EOU {
+        if !self.model_type.supports_batch() {
             return Ok(());
         }
         let mut guard = self.cached.lock().map_err(|_| {
@@ -144,7 +168,10 @@ impl TranscriptionProvider for ParakeetProvider {
 
         if let Ok(dump_path) = std::env::var("WAYSTT_DUMP_WAV") {
             match std::fs::write(&dump_path, &audio_data) {
-                Ok(()) => eprintln!("🎧 Wrote captured WAV to {dump_path} ({} bytes)", audio_data.len()),
+                Ok(()) => eprintln!(
+                    "🎧 Wrote captured WAV to {dump_path} ({} bytes)",
+                    audio_data.len()
+                ),
                 Err(e) => eprintln!("⚠️  Failed to dump WAV to {dump_path}: {e}"),
             }
         }
@@ -163,9 +190,20 @@ impl TranscriptionProvider for ParakeetProvider {
             .map(|s| s.map(|v| f32::from(v) / f32::from(i16::MAX)))
             .collect();
 
-        let samples = samples.map_err(|e| {
+        let mut samples = samples.map_err(|e| {
             TranscriptionError::ConfigurationError(format!("Failed to parse WAV samples: {e}"))
         })?;
+
+        if self.model_type == ParakeetModelType::Nemotron {
+            if sample_rate != 16_000 {
+                return Err(TranscriptionError::ConfigurationError(format!(
+                    "Nemotron requires 16000 Hz audio for batch transcription, got {sample_rate} Hz"
+                )));
+            }
+            if channels > 1 {
+                samples = downmix_interleaved_to_mono(&samples, channels);
+            }
+        }
 
         let cached = Arc::clone(&self.cached);
         let model_path = self.model_path.clone();
@@ -240,6 +278,20 @@ fn load_model(
                     })?;
             Ok(CachedModel::Tdt(Box::new(model)))
         }
+        ParakeetModelType::Nemotron => {
+            validate_nemotron_model_dir(model_path)?;
+            let model = parakeet_rs::Nemotron::from_pretrained(model_path_str, Some(exec_config))
+                .map_err(|e| {
+                    TranscriptionError::ApiError(ApiErrorDetails {
+                        provider: "Parakeet (Nemotron)".to_string(),
+                        status_code: None,
+                        error_code: Some("MODEL_LOAD_ERROR".to_string()),
+                        error_message: format!("Failed to load Nemotron model: {e}"),
+                        raw_response: None,
+                    })
+                })?;
+            Ok(CachedModel::Nemotron(Box::new(model)))
+        }
         ParakeetModelType::EOU => Err(TranscriptionError::ConfigurationError(
             "EOU model does not support batch transcription".to_string(),
         )),
@@ -291,7 +343,44 @@ fn transcribe_with_cached(
                 })?;
             Ok(result.text)
         }
+        CachedModel::Nemotron(m) => m.transcribe_audio(&samples).map_err(|e| {
+            TranscriptionError::ApiError(ApiErrorDetails {
+                provider: "Parakeet (Nemotron)".to_string(),
+                status_code: None,
+                error_code: Some("TRANSCRIPTION_ERROR".to_string()),
+                error_message: format!("Nemotron transcription failed: {e}"),
+                raw_response: None,
+            })
+        }),
     }
+}
+
+pub fn validate_nemotron_model_dir(model_path: &Path) -> Result<(), TranscriptionError> {
+    let missing: Vec<&str> = NEMOTRON_REQUIRED_FILES
+        .iter()
+        .copied()
+        .filter(|file| !model_path.join(file).exists())
+        .collect();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(TranscriptionError::ConfigurationError(format!(
+            "Nemotron model directory {} is missing required files: {}. \
+             Required files are: {}. Download the ONNX layout from \
+             https://huggingface.co/altunenes/parakeet-rs/tree/main/nemotron-speech-streaming-en-0.6b",
+            model_path.display(),
+            missing.join(", "),
+            NEMOTRON_REQUIRED_FILES.join(", ")
+        )))
+    }
+}
+
+fn downmix_interleaved_to_mono(samples: &[f32], channels: u16) -> Vec<f32> {
+    let channels = usize::from(channels);
+    samples
+        .chunks(channels)
+        .map(|frame| frame.iter().sum::<f32>() / frame.len() as f32)
+        .collect()
 }
 
 #[cfg(test)]
@@ -306,23 +395,44 @@ mod tests {
         assert_eq!(ParakeetModelType::parse("TDT"), ParakeetModelType::TDT);
         assert_eq!(ParakeetModelType::parse("eou"), ParakeetModelType::EOU);
         assert_eq!(ParakeetModelType::parse("EOU"), ParakeetModelType::EOU);
+        assert_eq!(
+            ParakeetModelType::parse("nemotron"),
+            ParakeetModelType::Nemotron
+        );
+        assert_eq!(
+            ParakeetModelType::parse("NEMOTRON"),
+            ParakeetModelType::Nemotron
+        );
         // Default to CTC for unknown
         assert_eq!(ParakeetModelType::parse("unknown"), ParakeetModelType::CTC);
         assert_eq!(ParakeetModelType::parse(""), ParakeetModelType::CTC);
+    }
+
+    #[test]
+    fn test_parakeet_model_type_capabilities() {
+        assert!(ParakeetModelType::CTC.supports_batch());
+        assert!(ParakeetModelType::TDT.supports_batch());
+        assert!(ParakeetModelType::Nemotron.supports_batch());
+        assert!(!ParakeetModelType::EOU.supports_batch());
+
+        assert!(!ParakeetModelType::CTC.supports_streaming());
+        assert!(!ParakeetModelType::TDT.supports_streaming());
+        assert!(ParakeetModelType::EOU.supports_streaming());
+        assert!(ParakeetModelType::Nemotron.supports_streaming());
     }
 
     #[tokio::test]
     async fn test_eou_model_rejects_batch_transcription() {
         let tmp = tempfile::tempdir().unwrap();
         // Directory exists so the provider itself initializes.
-        let provider =
-            ParakeetProvider::new(tmp.path(), ParakeetModelType::EOU, None, None).expect("provider");
+        let provider = ParakeetProvider::new(tmp.path(), ParakeetModelType::EOU, None, None)
+            .expect("provider");
         let result = provider.transcribe_with_language(vec![], None).await;
         match result {
             Err(TranscriptionError::ConfigurationError(msg)) => {
                 assert!(msg.contains("EOU model requires continuous or daemon-streaming mode"));
             }
-            other => panic!("expected ConfigurationError, got {other:?}"),
+            _ => panic!("expected ConfigurationError"),
         }
     }
 
@@ -340,12 +450,39 @@ mod tests {
     }
 
     #[test]
+    fn test_nemotron_provider_validates_required_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("encoder.onnx"), b"").unwrap();
+        let result = ParakeetProvider::new(tmp.path(), ParakeetModelType::Nemotron, None, None);
+        match result {
+            Err(TranscriptionError::ConfigurationError(msg)) => {
+                assert!(msg.contains("Nemotron model directory"));
+                assert!(msg.contains("encoder.onnx.data"));
+                assert!(msg.contains("decoder_joint.onnx"));
+                assert!(msg.contains("tokenizer.model"));
+                assert!(msg.contains("altunenes/parakeet-rs"));
+            }
+            _ => panic!("expected ConfigurationError"),
+        }
+    }
+
+    #[test]
+    fn test_nemotron_provider_accepts_required_file_layout() {
+        let tmp = tempfile::tempdir().unwrap();
+        for file in NEMOTRON_REQUIRED_FILES {
+            std::fs::write(tmp.path().join(file), b"").unwrap();
+        }
+        let provider = ParakeetProvider::new(tmp.path(), ParakeetModelType::Nemotron, None, None);
+        assert!(provider.is_ok());
+    }
+
+    #[test]
     fn test_exec_config_overrides_thread_counts() {
         let tmp = tempfile::tempdir().unwrap();
-        let provider =
-            ParakeetProvider::new(tmp.path(), ParakeetModelType::CTC, Some(12), Some(2))
-                .expect("provider");
-        let cfg = ParakeetProvider::build_exec_config(provider.intra_threads, provider.inter_threads);
+        let provider = ParakeetProvider::new(tmp.path(), ParakeetModelType::CTC, Some(12), Some(2))
+            .expect("provider");
+        let cfg =
+            ParakeetProvider::build_exec_config(provider.intra_threads, provider.inter_threads);
         // We only expose Debug on ExecutionConfig; round-trip through the
         // struct's fields by inspecting its Debug repr since the fields
         // are pub(crate). This guards against accidentally dropping the
@@ -366,7 +503,8 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let provider = ParakeetProvider::new(tmp.path(), ParakeetModelType::CTC, None, None)
             .expect("provider");
-        let cfg = ParakeetProvider::build_exec_config(provider.intra_threads, provider.inter_threads);
+        let cfg =
+            ParakeetProvider::build_exec_config(provider.intra_threads, provider.inter_threads);
         let repr = format!("{cfg:?}");
         // parakeet-rs defaults: intra=4, inter=1. See
         // `execution.rs` ModelConfig::default in the crate.

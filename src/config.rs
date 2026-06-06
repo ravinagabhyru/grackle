@@ -613,6 +613,10 @@ impl Config {
                             model_path.display()
                         ));
                     }
+                    if self.parakeet_model_type.eq_ignore_ascii_case("nemotron") {
+                        crate::transcription::parakeet::validate_nemotron_model_dir(&model_path)
+                            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+                    }
                 }
             }
             _ => {
@@ -732,7 +736,8 @@ pub fn validate_bootstrap(cfg: &Config) -> anyhow::Result<()> {
     }
 
     if cfg.transcription_provider == "parakeet"
-        && cfg.parakeet_model_type.eq_ignore_ascii_case("eou")
+        && (cfg.parakeet_model_type.eq_ignore_ascii_case("eou")
+            || cfg.parakeet_model_type.eq_ignore_ascii_case("nemotron"))
     {
         let lang = cfg.whisper_language.trim();
         let english_ok = lang.is_empty()
@@ -742,8 +747,9 @@ pub fn validate_bootstrap(cfg: &Config) -> anyhow::Result<()> {
             || lang.to_ascii_lowercase().starts_with("en_");
         if !english_ok {
             eprintln!(
-                "Warning: PARAKEET_MODEL_TYPE=eou is English-only; \
-                 WHISPER_LANGUAGE={lang} will be ignored."
+                "Warning: PARAKEET_MODEL_TYPE={} is English-only; \
+                 WHISPER_LANGUAGE={lang} will be ignored.",
+                cfg.parakeet_model_type
             );
         }
     }
@@ -1049,6 +1055,38 @@ mod tests {
         assert_eq!(c.continuous_max_chunk_ms, 15_000);
         assert_eq!(c.continuous_worker_count, 3);
         assert_eq!(c.continuous_max_queue_size, 20);
+    }
+
+    #[test]
+    fn test_load_toml_with_nemotron_model_type() {
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "transcription_provider = \"parakeet\"").unwrap();
+        writeln!(f, "[parakeet]").unwrap();
+        writeln!(f, "model_type = \"Nemotron\"").unwrap();
+
+        let c = Config::load_toml_file(f.path()).unwrap();
+        assert_eq!(c.parakeet_model_type, "nemotron");
+        assert_eq!(
+            Config::parakeet_model_path(&c.parakeet_model_type),
+            Config::parakeet_model_dir().join("nemotron")
+        );
+    }
+
+    #[cfg(feature = "parakeet")]
+    #[test]
+    fn test_validate_nemotron_reports_required_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut c = Config::default();
+        c.transcription_provider = "parakeet".to_string();
+        c.parakeet_model_type = "nemotron".to_string();
+        c.parakeet_model_path = Some(tmp.path().display().to_string());
+
+        let err = c.validate().unwrap_err().to_string();
+        assert!(err.contains("Nemotron model directory"));
+        assert!(err.contains("encoder.onnx"));
+        assert!(err.contains("encoder.onnx.data"));
+        assert!(err.contains("decoder_joint.onnx"));
+        assert!(err.contains("tokenizer.model"));
     }
 
     #[test]

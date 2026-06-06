@@ -240,9 +240,7 @@ impl App {
         };
         let model = match self.config.provider_kind() {
             crate::transcription::ProviderKind::OpenAI => self.config.whisper_model.clone(),
-            crate::transcription::ProviderKind::Google => {
-                self.config.google_speech_model.clone()
-            }
+            crate::transcription::ProviderKind::Google => self.config.google_speech_model.clone(),
             crate::transcription::ProviderKind::Local => self.config.whisper_model.clone(),
             #[cfg(feature = "parakeet")]
             crate::transcription::ProviderKind::Parakeet => {
@@ -272,19 +270,45 @@ impl App {
             .pipeline
             .transcribe(wav, self.provider.as_ref(), language_opt)
             .await?;
-        let text = if self.config.refine_enabled_for_batch() {
+        Ok(self.refine_final_text(text, RefineScope::Batch).await)
+    }
+
+    async fn refine_final_text(&self, text: String, scope: RefineScope) -> String {
+        let refine_enabled = match scope {
+            RefineScope::Batch => self.config.refine_enabled_for_batch(),
+            RefineScope::Continuous => self.config.refine_enabled_for_continuous(),
+        };
+        let text = if refine_enabled {
             refine::refine_or_fallback(
                 self.text_refiner.as_ref(),
                 text,
                 self.config.llm_refine_min_chars,
-                RefineScope::Batch,
+                scope,
                 self.config.llm_refine_log_text,
             )
             .await
         } else {
             text
         };
-        Ok(text)
+
+        if self.should_normalize_nemotron_terminal_punctuation() {
+            refine::ensure_terminal_sentence_punctuation(text)
+        } else {
+            text
+        }
+    }
+
+    #[cfg(feature = "parakeet")]
+    fn should_normalize_nemotron_terminal_punctuation(&self) -> bool {
+        self.config.provider_kind() == crate::transcription::ProviderKind::Parakeet
+            && crate::transcription::parakeet::ParakeetModelType::parse(
+                &self.config.parakeet_model_type,
+            ) == crate::transcription::parakeet::ParakeetModelType::Nemotron
+    }
+
+    #[cfg(not(feature = "parakeet"))]
+    fn should_normalize_nemotron_terminal_punctuation(&self) -> bool {
+        false
     }
 
     /// Start capture and wait until trailing silence is detected, then stop.
@@ -437,6 +461,7 @@ impl App {
         let refine_min_chars = self.config.llm_refine_min_chars;
         let refine_log_text = self.config.llm_refine_log_text;
         let text_refiner = self.text_refiner.clone();
+        let normalize_terminal_punctuation = self.should_normalize_nemotron_terminal_punctuation();
         tokio::spawn(async move {
             while let Some(text) = output_rx.recv().await {
                 if text.is_empty() {
@@ -452,6 +477,11 @@ impl App {
                         refine_log_text,
                     )
                     .await
+                } else {
+                    text
+                };
+                let text = if normalize_terminal_punctuation {
+                    refine::ensure_terminal_sentence_punctuation(text)
                 } else {
                     text
                 };

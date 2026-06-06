@@ -67,7 +67,8 @@ model = "latest_long"
 # are ignored as likely noise.
 min_speech_ms = 300
 # Trailing silence that triggers chunk extraction on the batch path
-# (parakeet ctc/tdt, openai, google, local). Raise (e.g. 1000) to reduce
+# (parakeet ctc/tdt, openai, google, local) and finalization for
+# streaming Nemotron. Raise (e.g. 1000) to reduce
 # mid-sentence splits at the cost of ~300 ms more latency; lower for
 # snappier output. Streaming EOU ignores this — the model emits its own
 # end-of-utterance marker — except as a safety fallback.
@@ -87,9 +88,15 @@ max_queue_size = 10
 #          Used automatically in continuous and daemon modes; each detected
 #          utterance is emitted as a separate final string. EOU is rejected
 #          on the one-shot / stop-and-transcribe path — pick ctc or tdt.
+# "nemotron" - Experimental English streaming backend. Continuous mode feeds
+#          560 ms chunks and waystt's silence detector finalizes utterances.
+#          One-shot transcription uses Nemotron's batch helper.
 model_type = "eou"
 # Override the default model directory (defaults to
 # ~/.local/share/applications/waystt/parakeet/{model_type}/).
+# Nemotron defaults to ~/.local/share/applications/waystt/parakeet/nemotron/
+# and requires: encoder.onnx, encoder.onnx.data, decoder_joint.onnx,
+# tokenizer.model from the altunenes/parakeet-rs ONNX layout.
 # model_path = "/path/to/parakeet/model"
 # ONNX Runtime thread pools. Defaults are parakeet-rs's built-ins
 # (intra_threads = 4, inter_threads = 1). Setting intra_threads to your

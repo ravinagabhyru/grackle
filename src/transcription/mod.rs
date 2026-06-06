@@ -12,6 +12,9 @@ pub mod local;
 // Parakeet provider using NVIDIA Parakeet models via ONNX Runtime
 #[cfg(feature = "parakeet")]
 pub mod parakeet;
+// Nemotron streaming provider (experimental English backend)
+#[cfg(feature = "parakeet")]
+pub mod nemotron_streaming;
 // Parakeet streaming provider (EOU model) — emits finalized utterances as audio flows in
 #[cfg(feature = "parakeet")]
 pub mod parakeet_streaming;
@@ -138,8 +141,10 @@ pub trait StreamingSession: Send {
     /// If this chunk advances past a natural utterance boundary (e.g. the
     /// underlying model detects end-of-utterance), the completed text is
     /// returned. Otherwise returns an empty string.
-    async fn push_samples(&mut self, samples: &[f32])
-        -> Result<String, TranscriptionError>;
+    async fn push_samples(
+        &mut self,
+        samples: &[f32],
+    ) -> Result<String, TranscriptionError>;
 
     /// Force-finalize the current utterance, flushing any buffered audio
     /// through the model. Returns the accumulated text (possibly empty).
@@ -221,10 +226,13 @@ impl TranscriptionFactory {
                     cfg.parakeet_intra_threads,
                     cfg.parakeet_inter_threads,
                 )?;
-                // Eagerly load the ONNX session so the user's first
+                // Eagerly load CTC/TDT so the user's first
                 // `wayctl stop-and-transcribe` doesn't pay the cold-load
-                // cost. EOU is skipped (streaming path owns its own warm-up).
-                if model_type != parakeet::ParakeetModelType::EOU {
+                // cost. Streaming models own their load path separately.
+                if matches!(
+                    model_type,
+                    parakeet::ParakeetModelType::CTC | parakeet::ParakeetModelType::TDT
+                ) {
                     eprintln!("Pre-loading Parakeet {} model...", cfg.parakeet_model_type);
                     if let Err(e) = provider.warm_up() {
                         eprintln!(
@@ -240,8 +248,8 @@ impl TranscriptionFactory {
     /// Create a streaming provider if the configuration supports one.
     ///
     /// Returns `Ok(None)` for batch-only providers (OpenAI, Google, local whisper,
-    /// Parakeet CTC/TDT). Only `ProviderKind::Parakeet` with `PARAKEET_MODEL_TYPE=eou`
-    /// currently yields a streaming provider.
+    /// Parakeet CTC/TDT). `ProviderKind::Parakeet` with `PARAKEET_MODEL_TYPE=eou`
+    /// or `nemotron` yields a streaming provider.
     ///
     /// # Errors
     ///
@@ -256,18 +264,25 @@ impl TranscriptionFactory {
         match kind {
             #[cfg(feature = "parakeet")]
             ProviderKind::Parakeet => {
-                if parakeet::ParakeetModelType::parse(&cfg.parakeet_model_type)
-                    != parakeet::ParakeetModelType::EOU
-                {
-                    return Ok(None);
-                }
+                let model_type = parakeet::ParakeetModelType::parse(&cfg.parakeet_model_type);
                 let model_path = if let Some(ref custom_path) = cfg.parakeet_model_path {
                     std::path::PathBuf::from(custom_path)
                 } else {
                     crate::config::Config::parakeet_model_path(&cfg.parakeet_model_type)
                 };
-                let provider = parakeet_streaming::ParakeetStreamingProvider::new(&model_path)?;
-                Ok(Some(Box::new(provider)))
+                match model_type {
+                    parakeet::ParakeetModelType::EOU => {
+                        let provider =
+                            parakeet_streaming::ParakeetStreamingProvider::new(&model_path)?;
+                        Ok(Some(Box::new(provider)))
+                    }
+                    parakeet::ParakeetModelType::Nemotron => {
+                        let provider =
+                            nemotron_streaming::NemotronStreamingProvider::new(&model_path)?;
+                        Ok(Some(Box::new(provider)))
+                    }
+                    _ => Ok(None),
+                }
             }
             _ => Ok(None),
         }
@@ -454,6 +469,37 @@ mod tests {
             let cfg = crate::config::load_config();
             let result = TranscriptionFactory::create_provider(ProviderKind::Local, &cfg).await;
             assert!(result.is_err());
+        }
+    }
+
+    #[cfg(feature = "parakeet")]
+    #[tokio::test]
+    async fn test_streaming_provider_selection_returns_none_for_batch_parakeet() {
+        let mut cfg = crate::config::Config::default();
+        cfg.parakeet_model_type = "ctc".to_string();
+
+        let result =
+            TranscriptionFactory::create_streaming_provider(ProviderKind::Parakeet, &cfg).await;
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[cfg(feature = "parakeet")]
+    #[tokio::test]
+    async fn test_streaming_provider_selection_uses_nemotron_layout_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cfg = crate::config::Config::default();
+        cfg.parakeet_model_type = "nemotron".to_string();
+        cfg.parakeet_model_path = Some(tmp.path().display().to_string());
+
+        let result =
+            TranscriptionFactory::create_streaming_provider(ProviderKind::Parakeet, &cfg).await;
+        match result {
+            Err(TranscriptionError::ConfigurationError(msg)) => {
+                assert!(msg.contains("Nemotron model directory"));
+                assert!(msg.contains("encoder.onnx.data"));
+                assert!(msg.contains("tokenizer.model"));
+            }
+            _ => panic!("expected Nemotron ConfigurationError"),
         }
     }
 
