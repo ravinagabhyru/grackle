@@ -196,6 +196,7 @@ impl ContinuousModeController {
         provider: Arc<dyn TranscriptionProvider>,
         streaming: Option<Arc<dyn StreamingTranscriptionProvider>>,
         language: Option<String>,
+        partial_tx: Option<mpsc::UnboundedSender<String>>,
     ) -> Result<mpsc::Receiver<String>> {
         // Check if already running
         if self.state != ContinuousState::Stopped {
@@ -217,10 +218,13 @@ impl ContinuousModeController {
             // Streaming path: single stateful session. No worker pool, no
             // BTreeMap reordering, no output-ordering task — utterances are
             // naturally in order and emitted straight to `output_tx`.
-            let session = streaming
+            let mut session = streaming
                 .start_session(self.config.sample_rate)
                 .await
                 .map_err(|e| anyhow!("Failed to start streaming session: {e}"))?;
+            if let Some(tx) = partial_tx {
+                session.set_partial_sink(tx);
+            }
             self.streaming_session = Some(session);
             let _ = pipeline; // unused on streaming path — avoid dead-code warnings
             let _ = provider;
@@ -243,10 +247,8 @@ impl ContinuousModeController {
                 let lang = language.clone();
 
                 let handle = tokio::spawn(async move {
-                    transcription_worker(
-                        worker_id, rx, results, notify, pipeline, provider, lang,
-                    )
-                    .await;
+                    transcription_worker(worker_id, rx, results, notify, pipeline, provider, lang)
+                        .await;
                 });
                 self.worker_handles.push(handle);
             }
@@ -326,8 +328,7 @@ impl ContinuousModeController {
         }
 
         // Stats: every sample that flows through the session counts.
-        self.stats.total_audio_seconds +=
-            samples.len() as f32 / self.config.sample_rate as f32;
+        self.stats.total_audio_seconds += samples.len() as f32 / self.config.sample_rate as f32;
 
         // Feed the drained samples to the session. A non-empty return means
         // the model itself emitted an end-of-utterance marker and the text

@@ -17,6 +17,7 @@ futures = "0.3"
 clap = { version = "4.0", features = ["derive"] }
 toml = "0.8"
 dirs = "5.0"
+eframe = "0.31"
 
 # Audio capture
 cpal = "0.15"
@@ -62,6 +63,10 @@ path = "src/bin/waystt.rs"
 [[bin]]
 name = "wayctl"
 path = "src/bin/wayctl.rs"
+
+[[bin]]
+name = "waystt-ui"
+path = "src/bin/waystt_ui.rs"
 
 [features]
 default = ["parakeet", "llm-refine"]

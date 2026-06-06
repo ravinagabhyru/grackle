@@ -2,9 +2,12 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::broadcast;
 
 use crate::app::App;
+use crate::transcript_events::TranscriptEvent;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -140,8 +143,7 @@ pub async fn serve(mut app: App, socket_path: PathBuf) -> Result<()> {
             accept_result = listener.accept() => {
                 match accept_result {
                     Ok((stream, _)) => {
-                        // Handle connections sequentially to avoid reentrancy for now
-                        if let Err(e) = handle_connection(stream, &mut app).await {
+                        if let Err(e) = handle_accepted_connection(stream, &mut app).await {
                             eprintln!("IPC connection error: {e}");
                         }
                     }
@@ -162,11 +164,59 @@ pub async fn serve(mut app: App, socket_path: PathBuf) -> Result<()> {
     }
 }
 
-async fn handle_connection(stream: UnixStream, app: &mut App) -> Result<()> {
+async fn handle_accepted_connection(stream: UnixStream, app: &mut App) -> Result<()> {
     let (reader, mut writer) = stream.into_split();
     let mut reader = BufReader::new(reader);
     let mut buf = String::new();
 
+    loop {
+        if reader.read_line(&mut buf).await? == 0 {
+            return Ok(());
+        }
+        let line = buf.trim_end_matches(['\r', '\n']).to_string();
+        buf.clear();
+
+        if line.is_empty() {
+            continue;
+        }
+
+        let req: IpcRequest = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(e) => {
+                write_bad_request(&mut writer, e.to_string()).await?;
+                continue;
+            }
+        };
+
+        if req.cmd == "continuous_subscribe" {
+            let rx = app.subscribe_events();
+            let status = app.ipc_status();
+            let state = TranscriptEvent::State {
+                state: status.state,
+                provider: status.provider,
+                model: status.model,
+            };
+            tokio::spawn(async move {
+                run_subscriber(writer, rx, Some(state)).await;
+            });
+            return Ok(());
+        }
+
+        return handle_connection(reader, writer, app, Some(req)).await;
+    }
+}
+
+async fn handle_connection(
+    mut reader: BufReader<OwnedReadHalf>,
+    mut writer: OwnedWriteHalf,
+    app: &mut App,
+    initial_req: Option<IpcRequest>,
+) -> Result<()> {
+    if let Some(req) = initial_req {
+        write_response(&mut writer, dispatch_request(app, req).await).await?;
+    }
+
+    let mut buf = String::new();
     while reader.read_line(&mut buf).await? != 0 {
         let line = buf.trim_end_matches(['\r', '\n']).to_string();
         buf.clear();
@@ -178,26 +228,68 @@ async fn handle_connection(stream: UnixStream, app: &mut App) -> Result<()> {
         let req: IpcRequest = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(e) => {
-                let resp = IpcResponse {
-                    id: String::new(),
-                    ok: false,
-                    result: None,
-                    error: Some(IpcError {
-                        code: "bad_request".into(),
-                        message: e.to_string(),
-                    }),
-                };
-                let payload = serde_json::to_string(&resp)? + "\n";
-                writer.write_all(payload.as_bytes()).await?;
+                write_bad_request(&mut writer, e.to_string()).await?;
                 continue;
             }
         };
 
         let resp = dispatch_request(app, req).await;
-        let payload = serde_json::to_string(&resp)? + "\n";
-        writer.write_all(payload.as_bytes()).await?;
-        writer.flush().await?;
+        write_response(&mut writer, resp).await?;
     }
+    Ok(())
+}
+
+async fn write_bad_request(writer: &mut OwnedWriteHalf, message: String) -> Result<()> {
+    let resp = IpcResponse {
+        id: String::new(),
+        ok: false,
+        result: None,
+        error: Some(IpcError {
+            code: "bad_request".into(),
+            message,
+        }),
+    };
+    write_response(writer, resp).await
+}
+
+async fn write_response(writer: &mut OwnedWriteHalf, resp: IpcResponse) -> Result<()> {
+    let payload = serde_json::to_string(&resp)? + "\n";
+    writer.write_all(payload.as_bytes()).await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn run_subscriber(
+    mut writer: OwnedWriteHalf,
+    mut rx: broadcast::Receiver<TranscriptEvent>,
+    initial_state: Option<TranscriptEvent>,
+) {
+    if let Some(event) = initial_state {
+        if write_transcript_event(&mut writer, &event).await.is_err() {
+            return;
+        }
+    }
+
+    loop {
+        match rx.recv().await {
+            Ok(event) => {
+                if write_transcript_event(&mut writer, &event).await.is_err() {
+                    return;
+                }
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(broadcast::error::RecvError::Closed) => return,
+        }
+    }
+}
+
+async fn write_transcript_event(
+    writer: &mut OwnedWriteHalf,
+    event: &TranscriptEvent,
+) -> Result<()> {
+    let payload = serde_json::to_string(event)? + "\n";
+    writer.write_all(payload.as_bytes()).await?;
+    writer.flush().await?;
     Ok(())
 }
 

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use async_trait::async_trait;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 
 use super::{
     parakeet, ApiErrorDetails, StreamingSession, StreamingTranscriptionProvider, TranscriptionError,
@@ -21,6 +21,7 @@ const NEMOTRON_CHUNK_SAMPLES: usize = 8960;
 
 pub trait NemotronInference: Send {
     fn transcribe_chunk(&mut self, chunk: &[f32]) -> Result<String, TranscriptionError>;
+    fn get_transcript(&mut self) -> Result<String, TranscriptionError>;
     fn reset(&mut self);
 }
 
@@ -47,6 +48,10 @@ impl NemotronInference for RealNemotron {
                 raw_response: None,
             })
         })
+    }
+
+    fn get_transcript(&mut self) -> Result<String, TranscriptionError> {
+        Ok(self.model.get_transcript())
     }
 
     fn reset(&mut self) {
@@ -122,6 +127,7 @@ enum Cmd {
     Reset {
         reply: oneshot::Sender<()>,
     },
+    SetPartialSink(mpsc::UnboundedSender<String>),
     Shutdown,
 }
 
@@ -202,6 +208,10 @@ impl NemotronSession {
         })?
     }
 
+    fn install_partial_sink(&mut self, sink: mpsc::UnboundedSender<String>) {
+        let _ = self.cmd_tx.send(Cmd::SetPartialSink(sink));
+    }
+
     async fn send_reset(&mut self) -> Result<(), TranscriptionError> {
         let (reply_tx, reply_rx) = oneshot::channel();
         self.cmd_tx
@@ -232,6 +242,10 @@ impl Drop for NemotronSession {
 
 #[async_trait]
 impl StreamingSession for NemotronSession {
+    fn set_partial_sink(&mut self, sink: mpsc::UnboundedSender<String>) {
+        self.install_partial_sink(sink);
+    }
+
     async fn push_samples(&mut self, samples: &[f32]) -> Result<String, TranscriptionError> {
         self.carry_over.extend_from_slice(samples);
 
@@ -260,14 +274,26 @@ impl StreamingSession for NemotronSession {
 }
 
 fn run_worker(model: &mut dyn NemotronInference, cmd_rx: &std_mpsc::Receiver<Cmd>) {
+    let mut partial_sink: Option<mpsc::UnboundedSender<String>> = None;
     while let Ok(cmd) = cmd_rx.recv() {
         match cmd {
             Cmd::Chunk { samples, reply } => {
-                let _ = reply.send(model.transcribe_chunk(&samples));
+                let result = model.transcribe_chunk(&samples);
+                if result.is_ok() {
+                    if let Some(ref sink) = partial_sink {
+                        if let Ok(full_hypothesis) = model.get_transcript() {
+                            let _ = sink.send(full_hypothesis);
+                        }
+                    }
+                }
+                let _ = reply.send(result);
             }
             Cmd::Reset { reply } => {
                 model.reset();
                 let _ = reply.send(());
+            }
+            Cmd::SetPartialSink(sink) => {
+                partial_sink = Some(sink);
             }
             Cmd::Shutdown => break,
         }
@@ -300,6 +326,10 @@ mod tests {
                 let response = self.responses.remove(0);
                 response
             }
+        }
+
+        fn get_transcript(&mut self) -> Result<String, TranscriptionError> {
+            Ok(String::new())
         }
 
         fn reset(&mut self) {

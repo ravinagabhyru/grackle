@@ -17,6 +17,7 @@ pub mod ipc;
 pub mod pipeline;
 pub mod refine;
 pub mod signals;
+pub mod transcript_events;
 
 // Re-export existing modules for backward-compatibility and tests
 pub mod audio;
@@ -27,6 +28,8 @@ pub mod command;
 pub mod test_utils;
 pub mod transcription;
 pub mod wav;
+
+pub use transcript_events::TranscriptEvent;
 
 /// Run the application given CLI-level `RunOptions`.
 /// Returns a process exit code.

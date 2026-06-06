@@ -1,7 +1,9 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
 use futures::stream::StreamExt;
+use tokio::sync::broadcast;
 
 use crate::audio::AudioRecorder;
 use crate::beep::{BeepConfig, BeepPlayer, BeepType};
@@ -11,6 +13,7 @@ use crate::continuous::{ContinuousConfig, ContinuousModeController, ContinuousSt
 use crate::pipeline::AudioPipeline;
 use crate::refine::{self, RefineScope, TextRefiner};
 use crate::signals;
+use crate::transcript_events::TranscriptEvent;
 use crate::transcription::{StreamingTranscriptionProvider, TranscriptionProvider};
 
 pub struct App {
@@ -27,6 +30,8 @@ pub struct App {
     text_refiner: Option<Arc<dyn TextRefiner>>,
     /// Controller for continuous speech recognition mode
     continuous: Option<ContinuousModeController>,
+    event_tx: broadcast::Sender<TranscriptEvent>,
+    current_seq: Arc<AtomicU64>,
 }
 
 impl App {
@@ -89,7 +94,17 @@ impl App {
             pipe_to: options.pipe_to,
             text_refiner,
             continuous: None,
+            event_tx: broadcast::channel(256).0,
+            current_seq: Arc::new(AtomicU64::new(0)),
         })
+    }
+
+    pub fn event_sender(&self) -> broadcast::Sender<TranscriptEvent> {
+        self.event_tx.clone()
+    }
+
+    pub fn subscribe_events(&self) -> broadcast::Receiver<TranscriptEvent> {
+        self.event_tx.subscribe()
     }
 
     /// Run the app in continuous mode: start capturing immediately, stream
@@ -441,6 +456,7 @@ impl App {
         };
 
         // Create and start controller
+        let (partial_tx, mut partial_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let mut controller = ContinuousModeController::new(config);
         let mut output_rx = controller
             .start(
@@ -448,10 +464,20 @@ impl App {
                 Arc::clone(&self.provider),
                 self.streaming_provider.as_ref().map(Arc::clone),
                 language,
+                Some(partial_tx),
             )
             .await?;
 
         self.continuous = Some(controller);
+
+        let partial_event_tx = self.event_sender();
+        let partial_seq = Arc::clone(&self.current_seq);
+        tokio::spawn(async move {
+            while let Some(text) = partial_rx.recv().await {
+                let seq = partial_seq.load(Ordering::SeqCst);
+                let _ = partial_event_tx.send(TranscriptEvent::Partial { seq, text });
+            }
+        });
 
         // Spawn task to handle output
         let pipe_to = self.pipe_to.clone();
@@ -462,12 +488,15 @@ impl App {
         let refine_log_text = self.config.llm_refine_log_text;
         let text_refiner = self.text_refiner.clone();
         let normalize_terminal_punctuation = self.should_normalize_nemotron_terminal_punctuation();
+        let event_tx = self.event_sender();
+        let current_seq = Arc::clone(&self.current_seq);
         tokio::spawn(async move {
             while let Some(text) = output_rx.recv().await {
                 if text.is_empty() {
                     continue;
                 }
                 eprintln!("[Continuous] Transcribed: \"{text}\"");
+                let raw_text = text.clone();
                 let text = if refine_enabled {
                     refine::refine_or_fallback(
                         text_refiner.as_ref(),
@@ -530,11 +559,17 @@ impl App {
                     match crate::command::execute_with_input(cmd, &text).await {
                         Ok(code) => {
                             if code != 0 {
-                                eprintln!("[Continuous] Pipe command exited with code {code}");
+                                let message =
+                                    format!("[Continuous] Pipe command exited with code {code}");
+                                eprintln!("{message}");
+                                let _ = event_tx.send(TranscriptEvent::Error { message });
                             }
                         }
                         Err(e) => {
-                            eprintln!("[Continuous] Failed to execute pipe command: {e}");
+                            let message =
+                                format!("[Continuous] Failed to execute pipe command: {e}");
+                            eprintln!("{message}");
+                            let _ = event_tx.send(TranscriptEvent::Error { message });
                         }
                     }
                 } else {
@@ -545,29 +580,48 @@ impl App {
                         }
                         crate::ipc::OutputMode::Clipboard => {
                             if let Err(e) = crate::ipc::copy_to_clipboard(&text).await {
-                                eprintln!("[Continuous] Failed to copy to clipboard: {e}");
+                                let message =
+                                    format!("[Continuous] Failed to copy to clipboard: {e}");
+                                eprintln!("{message}");
+                                let _ = event_tx.send(TranscriptEvent::Error { message });
                             }
                         }
                         crate::ipc::OutputMode::Type => {
                             if let Err(e) = crate::ipc::type_text(&text, type_newlines).await {
-                                eprintln!("[Continuous] Failed to type text: {e}");
+                                let message = format!("[Continuous] Failed to type text: {e}");
+                                eprintln!("{message}");
+                                let _ = event_tx.send(TranscriptEvent::Error { message });
                             }
                         }
                         crate::ipc::OutputMode::Wtype => {
                             if let Err(e) = crate::ipc::type_text_wtype(&text, type_newlines).await
                             {
-                                eprintln!("[Continuous] Failed to type text with wtype: {e}");
+                                let message =
+                                    format!("[Continuous] Failed to type text with wtype: {e}");
+                                eprintln!("{message}");
+                                let _ = event_tx.send(TranscriptEvent::Error { message });
                             }
                         }
                         crate::ipc::OutputMode::Ydotool => {
                             if let Err(e) =
                                 crate::ipc::type_text_ydotool(&text, type_newlines).await
                             {
-                                eprintln!("[Continuous] Failed to type text with ydotool: {e}");
+                                let message =
+                                    format!("[Continuous] Failed to type text with ydotool: {e}");
+                                eprintln!("{message}");
+                                let _ = event_tx.send(TranscriptEvent::Error { message });
                             }
                         }
                     }
                 }
+                let seq = current_seq.load(Ordering::SeqCst);
+                let _ = event_tx.send(TranscriptEvent::Final {
+                    seq,
+                    raw_text,
+                    refined_text: text,
+                    output: output_mode,
+                });
+                current_seq.fetch_add(1, Ordering::SeqCst);
             }
         });
 

@@ -136,15 +136,16 @@ pub trait StreamingTranscriptionProvider: Send + Sync {
 /// (e.g. LLM-correction pipelines) want coherent finals, not mid-word noise.
 #[async_trait]
 pub trait StreamingSession: Send {
+    /// Install a sink that receives the full current hypothesis (UI partials).
+    /// Default: no-op (provider emits no partials).
+    fn set_partial_sink(&mut self, _sink: tokio::sync::mpsc::UnboundedSender<String>) {}
+
     /// Feed PCM f32 samples (any length, mono, at the session's sample rate).
     ///
     /// If this chunk advances past a natural utterance boundary (e.g. the
     /// underlying model detects end-of-utterance), the completed text is
     /// returned. Otherwise returns an empty string.
-    async fn push_samples(
-        &mut self,
-        samples: &[f32],
-    ) -> Result<String, TranscriptionError>;
+    async fn push_samples(&mut self, samples: &[f32]) -> Result<String, TranscriptionError>;
 
     /// Force-finalize the current utterance, flushing any buffered audio
     /// through the model. Returns the accumulated text (possibly empty).
