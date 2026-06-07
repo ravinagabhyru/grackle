@@ -84,13 +84,16 @@ max_queue_size = 10
 [parakeet]
 # "ctc"  - English-only, faster (batch / one-shot transcription only)
 # "tdt"  - Multilingual, 25 languages (batch / one-shot transcription only)
-# "eou"  - English-only, streaming with end-of-utterance detection.
-#          Used automatically in continuous and daemon modes; each detected
-#          utterance is emitted as a separate final string. EOU is rejected
-#          on the one-shot / stop-and-transcribe path — pick ctc or tdt.
-# "nemotron" - Experimental English streaming backend. Continuous mode feeds
-#          560 ms chunks and grackle's silence detector finalizes utterances.
-#          One-shot transcription uses Nemotron's batch helper.
+# "eou"  - English-only, lightweight (~0.12B) streaming model. Used in
+#          continuous and daemon modes; grackle's silence detector segments
+#          utterances (its in-band end-of-utterance marker is NOT used). Best
+#          for low-RAM / weak-CPU hardware. EOU is rejected on the one-shot /
+#          stop-and-transcribe path — pick ctc or tdt. NOTE: may be deprecated
+#          in a future release once nemotron leaves experimental status.
+# "nemotron" - Experimental English streaming backend (~0.6B). Continuous mode
+#          feeds 560 ms chunks and grackle's silence detector finalizes
+#          utterances; higher accuracy than eou and feeds live partials to
+#          grackle-ui. One-shot transcription uses Nemotron's batch helper.
 model_type = "eou"
 # Override the default model directory (defaults to
 # ~/.local/share/applications/grackle/parakeet/{model_type}/).
