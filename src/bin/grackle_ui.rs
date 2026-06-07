@@ -68,14 +68,13 @@ impl GrackleUiApp {
 
 impl eframe::App for GrackleUiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let state = self
-            .state
-            .lock()
-            .map(|state| state.clone())
-            .unwrap_or_else(|_| UiState {
+        let state = self.state.lock().map_or_else(
+            |_| UiState {
                 connection: Connection::Disconnected("UI state lock poisoned".to_string()),
                 ..UiState::default()
-            });
+            },
+            |state| state.clone(),
+        );
 
         egui::TopBottomPanel::top("status_bar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -158,7 +157,7 @@ fn spawn_reader_thread(state: Arc<Mutex<UiState>>, socket_path: PathBuf, ctx: eg
             Ok(mut stream) => {
                 if let Err(err) = stream
                     .write_all(SUBSCRIBE_REQUEST)
-                    .and_then(|_| stream.flush())
+                    .and_then(|()| stream.flush())
                 {
                     update_state(&state, &ctx, |state| {
                         state.connection = Connection::Disconnected(err.to_string());
@@ -262,7 +261,7 @@ fn apply_ui_action(state: &Arc<Mutex<UiState>>, ctx: &egui::Context, action: UiA
     let show = match action {
         UiAction::Show => true,
         UiAction::Hide => false,
-        UiAction::Toggle => !state.lock().map(|s| s.visible).unwrap_or(true),
+        UiAction::Toggle => !state.lock().map_or(true, |s| s.visible),
     };
 
     if show {

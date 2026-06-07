@@ -40,7 +40,7 @@ impl App {
     /// # Errors
     ///
     /// Returns an error if audio devices cannot be initialized or configured
-    pub async fn init(
+    pub fn init(
         options: RunOptions,
         config: Config,
         provider: Box<dyn TranscriptionProvider>,
@@ -307,7 +307,7 @@ impl App {
         };
 
         if self.should_normalize_nemotron_terminal_punctuation() {
-            refine::ensure_terminal_sentence_punctuation(text)
+            refine::ensure_terminal_sentence_punctuation(&text)
         } else {
             text
         }
@@ -510,7 +510,7 @@ impl App {
                     text
                 };
                 let text = if normalize_terminal_punctuation {
-                    refine::ensure_terminal_sentence_punctuation(text)
+                    refine::ensure_terminal_sentence_punctuation(&text)
                 } else {
                     text
                 };
@@ -681,6 +681,8 @@ impl App {
 
     /// Get status of continuous mode
     pub(crate) fn ipc_continuous_status(&self) -> Option<ContinuousState> {
-        self.continuous.as_ref().map(|c| c.state())
+        self.continuous
+            .as_ref()
+            .map(super::continuous::ContinuousModeController::state)
     }
 }

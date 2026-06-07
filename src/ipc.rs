@@ -280,7 +280,7 @@ async fn run_subscriber(
                     return;
                 }
             }
-            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(broadcast::error::RecvError::Lagged(_)) => {}
             Err(broadcast::error::RecvError::Closed) => return,
         }
     }
@@ -672,7 +672,7 @@ mod tests {
         assert!(chunks
             .iter()
             .skip(1)
-            .all(|chunk| { !chunk.chars().next().is_some_and(|c| c.is_whitespace()) }));
+            .all(|chunk| { !chunk.chars().next().is_some_and(char::is_whitespace) }));
     }
 
     #[test]

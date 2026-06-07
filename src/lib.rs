@@ -3,6 +3,27 @@
 //! This crate exposes a library-first API with a thin binary wrapper.
 //! It coordinates configuration bootstrap, provider creation, and running the app.
 
+// Pedantic clippy lints that are noisy for this codebase and not worth the
+// boilerplate/contortion of "fixing". The `check.yml` CI gate runs
+// `clippy::pedantic` as hard errors; these allows keep the useful pedantic
+// lints active while silencing the ones we deliberately opt out of.
+#![allow(
+    // Adding `# Errors`/`# Panics` doc sections to every fallible pub fn is
+    // boilerplate that doesn't earn its keep for an application crate.
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    // `#[must_use]` on every getter/builder is noise here.
+    clippy::must_use_candidate,
+    // A few orchestration functions are legitimately long; splitting them
+    // purely to satisfy a line count would hurt readability.
+    clippy::too_many_lines,
+    // Config structs naturally carry several independent on/off flags.
+    clippy::struct_excessive_bools,
+    // Sample-count -> f32 conversions for audio math are intentional and the
+    // precision loss is irrelevant at these magnitudes.
+    clippy::cast_precision_loss
+)]
+
 use anyhow::Result;
 use futures::stream::StreamExt;
 use std::io::Write;
@@ -82,8 +103,7 @@ pub async fn run(options: cli::RunOptions) -> Result<i32> {
         provider,
         streaming_provider,
         text_refiner,
-    )
-    .await?;
+    )?;
 
     match options.mode {
         crate::cli::RunMode::Daemon => {

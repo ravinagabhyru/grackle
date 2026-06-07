@@ -1,8 +1,8 @@
 //! `genai`-backed implementation of [`TextRefiner`].
 //!
-//! Covers OpenAI, Anthropic, Ollama, Groq, Gemini, xAI, DeepSeek, and other
+//! Covers `OpenAI`, Anthropic, Ollama, Groq, Gemini, xAI, `DeepSeek`, and other
 //! providers supported by the `genai` crate. Provider selection is derived
-//! from the configured model name (e.g. `gpt-4o-mini` → OpenAI,
+//! from the configured model name (e.g. `gpt-4o-mini` → `OpenAI`,
 //! `claude-haiku-4-5` → Anthropic, `llama3.2` → Ollama when a custom base
 //! URL is supplied).
 
@@ -126,7 +126,7 @@ impl TextRefiner for GenAiRefiner {
         let response = tokio::time::timeout(self.timeout, fut)
             .await
             .map_err(|_| RefineError::Timeout)?
-            .map_err(map_genai_error)?;
+            .map_err(|e| map_genai_error(&e))?;
         match response.first_text() {
             Some(s) if !s.trim().is_empty() => Ok(s.to_string()),
             _ => Err(RefineError::EmptyResponse),
@@ -134,7 +134,7 @@ impl TextRefiner for GenAiRefiner {
     }
 }
 
-fn map_genai_error(err: genai::Error) -> RefineError {
+fn map_genai_error(err: &genai::Error) -> RefineError {
     let msg = err.to_string();
     let lower = msg.to_lowercase();
     if lower.contains("401")
@@ -191,7 +191,7 @@ mod tests {
         };
         let refiner = unwrap_refiner(GenAiRefiner::from_config(&cfg));
         assert_eq!(refiner.model.as_ref(), "gpt-4o-mini");
-        assert_eq!(refiner.timeout, Duration::from_millis(5000));
+        assert_eq!(refiner.timeout, Duration::from_secs(5));
     }
 
     /// Hitting an unreachable local port must surface as a non-panicking

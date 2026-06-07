@@ -248,7 +248,7 @@ impl TranscriptionFactory {
 
     /// Create a streaming provider if the configuration supports one.
     ///
-    /// Returns `Ok(None)` for batch-only providers (OpenAI, Google, local whisper,
+    /// Returns `Ok(None)` for batch-only providers (`OpenAI`, Google, local whisper,
     /// Parakeet CTC/TDT). `ProviderKind::Parakeet` with `PARAKEET_MODEL_TYPE=eou`
     /// or `nemotron` yields a streaming provider.
     ///
@@ -476,8 +476,10 @@ mod tests {
     #[cfg(feature = "parakeet")]
     #[tokio::test]
     async fn test_streaming_provider_selection_returns_none_for_batch_parakeet() {
-        let mut cfg = crate::config::Config::default();
-        cfg.parakeet_model_type = "ctc".to_string();
+        let cfg = crate::config::Config {
+            parakeet_model_type: "ctc".to_string(),
+            ..Default::default()
+        };
 
         let result =
             TranscriptionFactory::create_streaming_provider(ProviderKind::Parakeet, &cfg).await;
@@ -488,9 +490,11 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_provider_selection_uses_nemotron_layout_errors() {
         let tmp = tempfile::tempdir().unwrap();
-        let mut cfg = crate::config::Config::default();
-        cfg.parakeet_model_type = "nemotron".to_string();
-        cfg.parakeet_model_path = Some(tmp.path().display().to_string());
+        let cfg = crate::config::Config {
+            parakeet_model_type: "nemotron".to_string(),
+            parakeet_model_path: Some(tmp.path().display().to_string()),
+            ..Default::default()
+        };
 
         let result =
             TranscriptionFactory::create_streaming_provider(ProviderKind::Parakeet, &cfg).await;

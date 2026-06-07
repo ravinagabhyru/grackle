@@ -167,7 +167,7 @@ pub async fn refine_or_fallback(
 
 /// Add a final sentence terminator when an ASR backend returns a complete
 /// utterance without one.
-pub fn ensure_terminal_sentence_punctuation(text: String) -> String {
+pub fn ensure_terminal_sentence_punctuation(text: &str) -> String {
     let mut text = text.trim_end().to_string();
     if text.is_empty() {
         return text;
@@ -285,29 +285,29 @@ mod tests {
 
     #[test]
     fn ensure_terminal_sentence_punctuation_adds_missing_period() {
-        let out = ensure_terminal_sentence_punctuation("hello world  ".into());
+        let out = ensure_terminal_sentence_punctuation("hello world  ");
         assert_eq!(out, "hello world.");
     }
 
     #[test]
     fn ensure_terminal_sentence_punctuation_preserves_existing_terminal_mark() {
         assert_eq!(
-            ensure_terminal_sentence_punctuation("hello world?".into()),
+            ensure_terminal_sentence_punctuation("hello world?"),
             "hello world?"
         );
         assert_eq!(
-            ensure_terminal_sentence_punctuation("hello world!".into()),
+            ensure_terminal_sentence_punctuation("hello world!"),
             "hello world!"
         );
         assert_eq!(
-            ensure_terminal_sentence_punctuation("hello world.".into()),
+            ensure_terminal_sentence_punctuation("hello world."),
             "hello world."
         );
     }
 
     #[test]
     fn ensure_terminal_sentence_punctuation_handles_trailing_quote() {
-        let out = ensure_terminal_sentence_punctuation("\"hello world\"".into());
+        let out = ensure_terminal_sentence_punctuation("\"hello world\"");
         assert_eq!(out, "\"hello world.\"");
     }
 

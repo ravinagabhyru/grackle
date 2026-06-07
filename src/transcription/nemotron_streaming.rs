@@ -323,8 +323,7 @@ mod tests {
             if self.responses.is_empty() {
                 Ok(String::new())
             } else {
-                let response = self.responses.remove(0);
-                response
+                self.responses.remove(0)
             }
         }
 

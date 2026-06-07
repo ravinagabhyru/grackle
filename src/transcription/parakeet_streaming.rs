@@ -80,7 +80,7 @@ pub trait EouInference: Send {
     /// `state_h`, `state_c`, and `last_token` while deliberately preserving
     /// `encoder_cache` and `audio_buffer` (see `parakeet_eou.rs:192-200`).
     /// Used at finalize time to break cross-utterance decoder-state leakage
-    /// without paying a full model reload and its MIN_BUFFER_SAMPLES warm-up.
+    /// without paying a full model reload and its `MIN_BUFFER_SAMPLES` warm-up.
     fn transcribe_chunk_reset(&mut self, chunk: &[f32]) -> Result<String, TranscriptionError>;
 
     /// Discard internal decoder/encoder state and start fresh by rebuilding
@@ -283,7 +283,7 @@ pub struct ParakeetEouSession {
     /// Monotonically-ratcheting peak abs-amplitude seen on any chunk so far.
     /// Used to rescale each chunk to roughly `NORMALIZE_TARGET_PEAK` before
     /// feeding the model — mirrors the batch path's `normalize_audio` step,
-    /// which is critical for ParakeetEOU (mel features from a raw ~0.04-peak
+    /// which is critical for `ParakeetEOU` (mel features from a raw ~0.04-peak
     /// mic signal produce essentially no decoder output).
     running_peak: f32,
 }

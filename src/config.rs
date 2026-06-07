@@ -695,21 +695,18 @@ pub fn bootstrap(config_path: Option<&Path>) -> anyhow::Result<Config> {
 ///
 /// Returns an error if the config file is specified but missing or malformed.
 pub fn bootstrap_unvalidated(config_path: Option<&Path>) -> anyhow::Result<Config> {
-    let mut cfg = match config_path {
-        Some(path) => {
-            if !path.exists() {
-                anyhow::bail!("config file not found: {}", path.display());
-            }
-            Config::load_toml_file(path)?
+    let mut cfg = if let Some(path) = config_path {
+        if !path.exists() {
+            anyhow::bail!("config file not found: {}", path.display());
         }
-        None => {
-            let def = default_config_path();
-            if def.exists() {
-                Config::load_toml_file(&def)?
-            } else {
-                maybe_warn_legacy_env_file();
-                Config::default()
-            }
+        Config::load_toml_file(path)?
+    } else {
+        let def = default_config_path();
+        if def.exists() {
+            Config::load_toml_file(&def)?
+        } else {
+            maybe_warn_legacy_env_file();
+            Config::default()
         }
     };
     cfg.apply_env_overrides();
@@ -1076,10 +1073,12 @@ mod tests {
     #[test]
     fn test_validate_nemotron_reports_required_files() {
         let tmp = tempfile::tempdir().unwrap();
-        let mut c = Config::default();
-        c.transcription_provider = "parakeet".to_string();
-        c.parakeet_model_type = "nemotron".to_string();
-        c.parakeet_model_path = Some(tmp.path().display().to_string());
+        let c = Config {
+            transcription_provider: "parakeet".to_string(),
+            parakeet_model_type: "nemotron".to_string(),
+            parakeet_model_path: Some(tmp.path().display().to_string()),
+            ..Default::default()
+        };
 
         let err = c.validate().unwrap_err().to_string();
         assert!(err.contains("Nemotron model directory"));

@@ -73,7 +73,7 @@ pub struct AudioChunk {
 /// Result of transcription with sequence number for ordering
 #[derive(Debug)]
 pub struct TranscriptionResult {
-    /// Sequence number matching the AudioChunk
+    /// Sequence number matching the `AudioChunk`
     pub seq: u64,
     /// Transcribed text (Ok) or error message (Err)
     pub result: Result<String, String>,
@@ -187,7 +187,7 @@ impl ContinuousModeController {
     /// If `streaming` is supplied, a single cache-aware streaming session is
     /// used (EOU model) and the worker pool is not spawned. Otherwise the
     /// batch path extracts chunks on silence and runs a small parallel
-    /// transcription pool (OpenAI, Google, Whisper, Parakeet CTC/TDT).
+    /// transcription pool (`OpenAI`, Google, Whisper, Parakeet CTC/TDT).
     ///
     /// Returns a receiver for transcription results (in capture order).
     pub async fn start(
@@ -480,10 +480,7 @@ impl ContinuousModeController {
                     }
                 }
 
-                eprintln!(
-                    "[Continuous] Extracted chunk seq={seq}, {} samples",
-                    buffer_len
-                );
+                eprintln!("[Continuous] Extracted chunk seq={seq}, {buffer_len} samples");
             }
 
             // Reset for next chunk
@@ -691,7 +688,7 @@ async fn process_chunk(
     let text = provider
         .transcribe_with_language(wav, language)
         .await
-        .map_err(|e| anyhow!("{}", e))?;
+        .map_err(|e| anyhow!("{e}"))?;
 
     Ok(text)
 }
