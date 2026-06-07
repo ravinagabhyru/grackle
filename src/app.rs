@@ -114,7 +114,7 @@ impl App {
     ///
     /// Returns an error if signal registration or recording setup fails.
     pub async fn run_continuous(mut self) -> Result<i32> {
-        eprintln!("waystt - Wayland Speech-to-Text Tool (continuous mode)");
+        eprintln!("grackle - Wayland Speech-to-Text Tool (continuous mode)");
 
         let opts = crate::ipc::IpcOptions::default();
         if let Err(e) = self.ipc_continuous_start(opts).await {
@@ -418,7 +418,7 @@ impl App {
         }
 
         // Create continuous config: config-file values are the baseline; IPC
-        // `options` overrides take precedence for the two knobs wayctl exposes.
+        // `options` overrides take precedence for the two knobs grackctl exposes.
         let config = ContinuousConfig {
             min_speech_ms: self.config.continuous_min_speech_ms,
             silence_threshold_ms: options

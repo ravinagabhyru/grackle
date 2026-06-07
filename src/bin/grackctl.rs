@@ -7,10 +7,10 @@ use tokio::net::UnixStream;
 use uuid::Uuid;
 
 #[derive(Parser)]
-#[command(name = "wayctl")]
-#[command(about = "Control client for waystt daemon")]
+#[command(name = "grackctl")]
+#[command(about = "Control client for grackle daemon")]
 struct Cli {
-    /// Path to the Unix socket (defaults to `XDG_RUNTIME_DIR/waystt/waystt.sock`)
+    /// Path to the Unix socket (defaults to `XDG_RUNTIME_DIR/grackle/grackle.sock`)
     #[arg(long)]
     socket: Option<PathBuf>,
 
@@ -58,27 +58,27 @@ enum Commands {
         output: OutputMode,
         #[arg(long, value_enum, default_value_t = TypeNewlines::Spaces)]
         type_newlines: TypeNewlines,
-        /// Also show the waystt-ui window (live partials)
+        /// Also show the grackle-ui window (live partials)
         #[arg(long)]
         ui: bool,
     },
     /// Stop continuous speech recognition mode
     #[command(name = "continuous-stop")]
     ContinuousStop {
-        /// Also hide the waystt-ui window
+        /// Also hide the grackle-ui window
         #[arg(long)]
         ui: bool,
     },
     /// Get continuous mode status
     #[command(name = "continuous-status")]
     ContinuousStatus,
-    /// Show the waystt-ui window
+    /// Show the grackle-ui window
     #[command(name = "ui-show")]
     UiShow,
-    /// Hide (background) the waystt-ui window
+    /// Hide (background) the grackle-ui window
     #[command(name = "ui-hide")]
     UiHide,
-    /// Toggle the waystt-ui window visibility
+    /// Toggle the grackle-ui window visibility
     #[command(name = "ui-toggle")]
     UiToggle,
 }
@@ -100,7 +100,7 @@ enum TypeNewlines {
 }
 
 fn default_socket() -> PathBuf {
-    waystt::ipc::default_socket_path()
+    grackle::ipc::default_socket_path()
 }
 
 #[tokio::main]

@@ -1,0 +1,28 @@
+grackle
+Copyright (C) 2025–2026 Ravi Nagabhyru and contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See the LICENSE file for the full text.
+
+------------------------------------------------------------------------------
+Attribution / Origin
+------------------------------------------------------------------------------
+
+grackle is a fork of "waystt", the Wayland speech-to-text tool originally
+written by Artur Roszczyk (sevos):
+
+    waystt — https://github.com/sevos/waystt
+    Copyright (C) Artur Roszczyk <artur.roszczyk@gmail.com>
+    Licensed under GPL-3.0-or-later
+
+Portions of this codebase originate from waystt and remain under
+GPL-3.0-or-later. The original copyright notice and license are retained. The
+complete upstream commit history is preserved in this repository's git history.
+
+Since forking, grackle has diverged substantially from upstream, including (but
+not limited to): a Unix-socket control client (grackctl), continuous and
+streaming transcription, local Parakeet/Nemotron transcription backends, and a
+live transcript UI (grackle-ui). These changes are Copyright (C) 2025–2026 Ravi
+Nagabhyru and contributors, likewise licensed under GPL-3.0-or-later.

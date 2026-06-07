@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Project rebranded from `waystt` to `grackle`.** This is a fork of
+  [waystt](https://github.com/sevos/waystt) by Artur Roszczyk (see
+  [NOTICE](NOTICE)). Binaries renamed: `waystt` → `grackle`, `wayctl` →
+  `grackctl`, `waystt-ui` → `grackle-ui`. Config now lives in
+  `~/.config/grackle/`, the control socket in `$XDG_RUNTIME_DIR/grackle/grackle.sock`,
+  and local models under `~/.local/share/applications/grackle/`. The
+  `WAYSTT_DUMP_WAV` env var is now `GRACKLE_DUMP_WAV`.
+  - **Migration:** move `~/.config/waystt/` → `~/.config/grackle/` (and any
+    models under `~/.local/share/applications/waystt/` → `.../grackle/`).
 
 ## [0.3.1] - 2025-10-06
 ### Changed
@@ -96,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-06-25
 
 ### Added
-- Initial release of waystt - Wayland Speech-to-Text Tool
+- Initial release of grackle - Wayland Speech-to-Text Tool
 - Signal-driven speech-to-text with dual output modes:
   - SIGUSR1: Direct text typing via ydotool 
   - SIGUSR2: Clipboard copy for manual pasting
@@ -128,7 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Keybinding Examples
 - Hyprland and Niri configuration examples provided
-- Process detection using `pgrep -x waystt` for reliable signal handling
+- Process detection using `pgrep -x grackle` for reliable signal handling
 
 ### Dependencies
 - tokio (async runtime)

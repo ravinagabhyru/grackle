@@ -228,7 +228,7 @@ impl TranscriptionFactory {
                     cfg.parakeet_inter_threads,
                 )?;
                 // Eagerly load CTC/TDT so the user's first
-                // `wayctl stop-and-transcribe` doesn't pay the cold-load
+                // `grackctl stop-and-transcribe` doesn't pay the cold-load
                 // cost. Streaming models own their load path separately.
                 if matches!(
                     model_type,

@@ -1,2 +1,15 @@
 /target
 .env
+
+# Dev container build dir (host uses target/, container uses target-docker/)
+/target-docker
+
+# Editor/agent tooling and local scratch (not part of the project)
+/.codex
+/.cortex-coord
+/.tmp-tools
+/refactor-plan.md
+/waystt-socket.md
+
+# Internal docs are not shipped in the public repo
+/docs

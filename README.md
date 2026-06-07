@@ -1,12 +1,12 @@
-# waystt - Wayland Speech-to-Text Tool
+# grackle - Wayland Speech-to-Text Tool
 
-Press a keybind, speak, and get instant text output. A speech-to-text tool that runs as a small Wayland-friendly daemon and is controlled with `wayctl`.
+Press a keybind, speak, and get instant text output. A speech-to-text tool that runs as a small Wayland-friendly daemon and is controlled with `grackctl`.
 
 ## Features
 
-- **Daemon + control client**: `waystt` + `wayctl` to start/stop/transcribe
+- **Daemon + control client**: `grackle` + `grackctl` to start/stop/transcribe
 - **UNIX philosophy**: Outputs transcribed text to stdout for piping to other tools
-- **On-demand transcription**: `wayctl transcribe` records until trailing silence and prints/copies/types the result
+- **On-demand transcription**: `grackctl transcribe` records until trailing silence and prints/copies/types the result
 - **Audio feedback**: Beeps confirm recording start/stop and success
 - **Wayland native**: Works with modern Linux desktops (Hyprland, Niri, etc.)
 - **Optional local transcription**: Run Whisper locally using whisper-rs
@@ -57,21 +57,21 @@ echo 'export YDOTOOL_SOCKET=/tmp/.ydotool_socket' >> ~/.bashrc
 
 ```bash
 # Using your preferred AUR helper
-yay -S waystt-bin
+yay -S grackle-bin
 # or
-paru -S waystt-bin
+paru -S grackle-bin
 ```
 
 ### Download Binary
 
-1. Download from [GitHub Releases](https://github.com/sevos/waystt/releases)
+1. Download from [GitHub Releases](https://github.com/ravinagabhyru/grackle/releases)
 2. Install:
 
 ```bash
-wget https://github.com/sevos/waystt/releases/latest/download/waystt-linux-x86_64
+wget https://github.com/ravinagabhyru/grackle/releases/latest/download/grackle-linux-x86_64
 mkdir -p ~/.local/bin
-mv waystt-linux-x86_64 ~/.local/bin/waystt
-chmod +x ~/.local/bin/waystt
+mv grackle-linux-x86_64 ~/.local/bin/grackle
+chmod +x ~/.local/bin/grackle
 
 # Add to PATH (add to ~/.bashrc or ~/.zshrc)
 export PATH="$HOME/.local/bin:$PATH"
@@ -81,30 +81,30 @@ export PATH="$HOME/.local/bin:$PATH"
 
 1. **Setup configuration:**
 ```bash
-mkdir -p ~/.config/waystt
-cp config.toml.example ~/.config/waystt/config.toml
-# Edit ~/.config/waystt/config.toml or export OPENAI_API_KEY for OpenAI.
+mkdir -p ~/.config/grackle
+cp config.toml.example ~/.config/grackle/config.toml
+# Edit ~/.config/grackle/config.toml or export OPENAI_API_KEY for OpenAI.
 ```
 
 2. **Start the daemon:**
 ```bash
-waystt
+grackle
 ```
 
-3. **Control it with `wayctl`:**
+3. **Control it with `grackctl`:**
 ```bash
-wayctl ping           # prints state/provider/model
-wayctl status         # prints state/provider/model
-wayctl start          # begin recording
-wayctl stop           # stop + transcribe to stdout (default)
-wayctl transcribe     # one-shot: auto-start, stop on trailing silence, transcribe
+grackctl ping           # prints state/provider/model
+grackctl status         # prints state/provider/model
+grackctl start          # begin recording
+grackctl stop           # stop + transcribe to stdout (default)
+grackctl transcribe     # one-shot: auto-start, stop on trailing silence, transcribe
 
 # Copy to clipboard or type directly
-wayctl transcribe --output clipboard
-wayctl transcribe --output type
+grackctl transcribe --output clipboard
+grackctl transcribe --output type
 
 # Configure trailing silence (default 3000ms)
-wayctl transcribe --silence-ms 5000
+grackctl transcribe --silence-ms 5000
 ```
 
 ## Quick Reference
@@ -113,34 +113,34 @@ wayctl transcribe --silence-ms 5000
 
 ```bash
 # Download local model and exit
-waystt --download-model
+grackle --download-model
 
 # Start daemon in a terminal
-waystt
+grackle
 
 # One-shot transcription, printing text to stdout
-wayctl transcribe
+grackctl transcribe
 
 # Copy or type the result
-wayctl transcribe --output clipboard
-wayctl transcribe --output type
+grackctl transcribe --output clipboard
+grackctl transcribe --output type
 
 # Start and stop manually
-wayctl start
-wayctl stop --output type
+grackctl start
+grackctl stop --output type
 ```
 
 ### Keybinding Pattern
 
-Start `waystt` on login, then bind compositor shortcuts to `wayctl`:
+Start `grackle` on login, then bind compositor shortcuts to `grackctl`:
 
 ```bash
 # Start daemon on login (see systemd user unit below)
 
 # Keybind examples
-bind = SUPER, R, exec, wayctl start
-bind = SUPER SHIFT, R, exec, wayctl stop --output type
-bind = SUPER CTRL, R, exec, wayctl stop --output clipboard
+bind = SUPER, R, exec, grackctl start
+bind = SUPER SHIFT, R, exec, grackctl stop --output type
+bind = SUPER CTRL, R, exec, grackctl stop --output clipboard
 ```
 
 ## Keyboard Shortcuts Setup
@@ -150,11 +150,11 @@ bind = SUPER CTRL, R, exec, wayctl stop --output clipboard
 Add to your `~/.config/hypr/hyprland.conf`:
 
 ```bash
-# waystt - Speech to Text (direct typing)
-bind = SUPER, R, exec, wayctl transcribe --output type
+# grackle - Speech to Text (direct typing)
+bind = SUPER, R, exec, grackctl transcribe --output type
 
-# waystt - Speech to Text (clipboard copy)
-bind = SUPER SHIFT, R, exec, wayctl transcribe --output clipboard
+# grackle - Speech to Text (clipboard copy)
+bind = SUPER SHIFT, R, exec, grackctl transcribe --output clipboard
 ```
 
 ### Niri
@@ -163,11 +163,11 @@ Add to your `~/.config/niri/config.kdl`:
 
 ```kdl
 binds {
-    // waystt - Speech to Text (direct typing)
-    Mod+R { spawn "wayctl" "transcribe" "--output" "type"; }
+    // grackle - Speech to Text (direct typing)
+    Mod+R { spawn "grackctl" "transcribe" "--output" "type"; }
     
-    // waystt - Speech to Text (clipboard copy)
-    Mod+Shift+R { spawn "wayctl" "transcribe" "--output" "clipboard"; }
+    // grackle - Speech to Text (clipboard copy)
+    Mod+Shift+R { spawn "grackctl" "transcribe" "--output" "clipboard"; }
 }
 ```
 
@@ -177,53 +177,53 @@ binds {
 
 ## Usage Examples
 
-Start `waystt` once as a daemon, then use `wayctl` for recording and output actions.
+Start `grackle` once as a daemon, then use `grackctl` for recording and output actions.
 
 ### Basic Usage (stdout)
 
 ```bash
-# Terminal 1: Start waystt
-waystt
+# Terminal 1: Start grackle
+grackle
 
 # Terminal 2: Record until trailing silence and print the transcript
-wayctl transcribe | tee transcription.txt
+grackctl transcribe | tee transcription.txt
 ```
 
 ### Output Actions
 
-Use `wayctl` output modes to choose where text goes:
+Use `grackctl` output modes to choose where text goes:
 
 ```bash
 # Copy transcription to clipboard
-wayctl transcribe --output clipboard
+grackctl transcribe --output clipboard
 
 # Type transcription directly into focused window
-wayctl transcribe --output type
+grackctl transcribe --output type
 
 # Save to file with timestamp
-printf '%s: %s\n' "$(date)" "$(wayctl transcribe)" >> speech-log.txt
+printf '%s: %s\n' "$(date)" "$(grackctl transcribe)" >> speech-log.txt
 ```
 
 
-## Daemon + wayctl
+## Daemon + grackctl
 
-Run a long-lived daemon and control it with `wayctl`.
+Run a long-lived daemon and control it with `grackctl`.
 
 ### Socket path
-- Default: `$XDG_RUNTIME_DIR/waystt/waystt.sock`
-- If `XDG_RUNTIME_DIR` is not set, the daemon falls back to `/tmp/waystt-<user>/waystt.sock`.
-- You can override the control client path with `wayctl --socket`.
+- Default: `$XDG_RUNTIME_DIR/grackle/grackle.sock`
+- If `XDG_RUNTIME_DIR` is not set, the daemon falls back to `/tmp/grackle-<user>/grackle.sock`.
+- You can override the control client path with `grackctl --socket`.
 
 ### Commands
-- `wayctl ping` → liveness + status summary
-- `wayctl status` → state/provider/model
-- `wayctl start` → begin recording
-- `wayctl stop [--output stdout|clipboard|type]` → stop + transcribe
-- `wayctl transcribe [--silence-ms 3000] [--output ...]` → auto-start, stop after trailing silence, transcribe
-- `wayctl cancel` → stop without transcription
+- `grackctl ping` → liveness + status summary
+- `grackctl status` → state/provider/model
+- `grackctl start` → begin recording
+- `grackctl stop [--output stdout|clipboard|type]` → stop + transcribe
+- `grackctl transcribe [--silence-ms 3000] [--output ...]` → auto-start, stop after trailing silence, transcribe
+- `grackctl cancel` → stop without transcription
 
 ### Output modes
-- `stdout` (default): print text to wayctl stdout
+- `stdout` (default): print text to grackctl stdout
 - `clipboard`: copy text using `wl-copy` (fallback: `xclip` on X11)
 - `type`: type text into the focused window using `wtype` (fallback: `ydotool`)
 
@@ -233,15 +233,15 @@ Notes:
 
 ### Systemd user unit (optional)
 
-Create `~/.config/systemd/user/waystt.service`:
+Create `~/.config/systemd/user/grackle.service`:
 
 ```
 [Unit]
-Description=waystt daemon
+Description=grackle daemon
 After=pipewire.service
 
 [Service]
-ExecStart=%h/.local/bin/waystt
+ExecStart=%h/.local/bin/grackle
 Restart=on-failure
 Environment=RUST_LOG=info
 
@@ -252,24 +252,24 @@ WantedBy=default.target
 Then:
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now waystt.service
+systemctl --user enable --now grackle.service
 ```
 
-You can now bind `wayctl` commands in your compositor to control the daemon.
+You can now bind `grackctl` commands in your compositor to control the daemon.
 
 ## Configuration
 
-Configuration is read from `~/.config/waystt/config.toml` by default. Override the path with `--config`:
+Configuration is read from `~/.config/grackle/config.toml` by default. Override the path with `--config`:
 
 ```bash
-waystt --config /path/to/custom/config.toml
+grackle --config /path/to/custom/config.toml
 ```
 
 Environment variables always override any value set in the file, so you can keep secrets like API keys out of the file and export them at runtime. The env-var name mirrors the legacy naming: `[section].key` maps to `SECTION_KEY` (e.g. `[openai] api_key` → `OPENAI_API_KEY`, `[llm_refine] api_key` → `LLM_REFINE_API_KEY`).
 
 See [`config.toml.example`](config.toml.example) for the full annotated template.
 
-waystt supports four transcription providers: **Parakeet** (local ONNX, default), **OpenAI Whisper**, **Google Speech-to-Text**, and **local Whisper** (whisper-rs).
+grackle supports four transcription providers: **Parakeet** (local ONNX, default), **OpenAI Whisper**, **Google Speech-to-Text**, and **local Whisper** (whisper-rs).
 
 ### Parakeet / Nemotron ONNX
 
@@ -283,14 +283,14 @@ model_type = "ctc"        # "ctc", "tdt", "eou", or "nemotron"
 # model_path = "/path/to/model"
 ```
 
-Default model directories follow `~/.local/share/applications/waystt/parakeet/{model_type}/`.
+Default model directories follow `~/.local/share/applications/grackle/parakeet/{model_type}/`.
 
 - `ctc`: English batch / one-shot transcription.
 - `tdt`: multilingual batch / one-shot transcription.
 - `eou`: English streaming with model end-of-utterance detection.
-- `nemotron`: experimental English streaming backend. Continuous mode feeds 560 ms chunks and waystt finalizes utterances on its existing silence detector. One-shot transcription uses `Nemotron::transcribe_audio()`.
+- `nemotron`: experimental English streaming backend. Continuous mode feeds 560 ms chunks and grackle finalizes utterances on its existing silence detector. One-shot transcription uses `Nemotron::transcribe_audio()`.
 
-Nemotron requires the ONNX layout from `altunenes/parakeet-rs`, not NVIDIA's `.nemo` repository layout. Put these files in `~/.local/share/applications/waystt/parakeet/nemotron/` or set `[parakeet].model_path`: `encoder.onnx`, `encoder.onnx.data`, `decoder_joint.onnx`, `tokenizer.model`.
+Nemotron requires the ONNX layout from `altunenes/parakeet-rs`, not NVIDIA's `.nemo` repository layout. Put these files in `~/.local/share/applications/grackle/parakeet/nemotron/` or set `[parakeet].model_path`: `encoder.onnx`, `encoder.onnx.data`, `decoder_joint.onnx`, `tokenizer.model`.
 
 ### OpenAI Whisper
 
@@ -321,7 +321,7 @@ Google Speech-to-Text provides fast, accurate transcription with support for man
    - Enable the "Cloud Speech-to-Text API"
    - Create a service account and download the JSON key file
 
-2. **Configure waystt for Google:**
+2. **Configure grackle for Google:**
 
 ```toml
 transcription_provider = "google"
@@ -341,10 +341,10 @@ Run transcription locally without sending audio to external APIs. Models are dow
 transcription_provider = "local"
 
 [whisper]
-model = "ggml-base.en.bin"         # stored under ~/.local/share/applications/waystt/models/
+model = "ggml-base.en.bin"         # stored under ~/.local/share/applications/grackle/models/
 ```
 
-Download with `waystt --download-model`.
+Download with `grackle --download-model`.
 
 **Available Models (GGML format):**
 - `ggml-tiny.bin` - Fastest, least accurate (39 MB)
@@ -407,17 +407,17 @@ Fails soft — any LLM error logs a warning and the original transcript is emitt
 
 ## Troubleshooting
 
-### IPC (daemon + wayctl)
+### IPC (daemon + grackctl)
 
-- Verify the daemon is running and note the socket path it prints on startup (defaults to `$XDG_RUNTIME_DIR/waystt/waystt.sock`).
-  - Check the socket exists: `ls -l "$XDG_RUNTIME_DIR/waystt/waystt.sock"`
-  - If `XDG_RUNTIME_DIR` is not set, the daemon falls back to `/tmp/waystt-<user>/waystt.sock`. Pass this path to `wayctl` with `--socket`.
-- Ensure `waystt` and `wayctl` are using the same socket:
-  - `wayctl --socket "$XDG_RUNTIME_DIR/waystt/waystt.sock" ping`
+- Verify the daemon is running and note the socket path it prints on startup (defaults to `$XDG_RUNTIME_DIR/grackle/grackle.sock`).
+  - Check the socket exists: `ls -l "$XDG_RUNTIME_DIR/grackle/grackle.sock"`
+  - If `XDG_RUNTIME_DIR` is not set, the daemon falls back to `/tmp/grackle-<user>/grackle.sock`. Pass this path to `grackctl` with `--socket`.
+- Ensure `grackle` and `grackctl` are using the same socket:
+  - `grackctl --socket "$XDG_RUNTIME_DIR/grackle/grackle.sock" ping`
 - Remove stale sockets and restart the daemon if needed:
-  - `rm -f "$XDG_RUNTIME_DIR/waystt/waystt.sock" && waystt`
+  - `rm -f "$XDG_RUNTIME_DIR/grackle/grackle.sock" && grackle`
 - Permissions: the socket directory should be `0700`, socket file `0600`, and both owned by your user.
-- Debug logs: run the daemon with `RUST_LOG=debug waystt` and re-run `wayctl`.
+- Debug logs: run the daemon with `RUST_LOG=debug grackle` and re-run `grackctl`.
 - Output actions failing with `no_backend`:
   - Clipboard: install `wl-clipboard` (Wayland) or `xclip` (X11) and re-try.
   - Type: install `wtype` (preferred) or set up `ydotool` (requires input group and running `ydotoold`).
@@ -455,7 +455,7 @@ cargo test
 ### Running with Debug Output
 
 ```bash
-# Using default config location (~/.config/waystt/config.toml)
+# Using default config location (~/.config/grackle/config.toml)
 RUST_LOG=debug cargo run
 
 # Or using a project-local config file for development
@@ -465,24 +465,38 @@ RUST_LOG=debug cargo run -- --config config.toml
 ## Building from Source
 
 ```bash
-git clone https://github.com/sevos/waystt.git
-cd waystt
+git clone https://github.com/ravinagabhyru/grackle.git
+cd grackle
 
 # Create config directory and copy example configuration
-mkdir -p ~/.config/waystt
-cp config.toml.example ~/.config/waystt/config.toml
-# Edit ~/.config/waystt/config.toml with your API key (or export OPENAI_API_KEY)
+mkdir -p ~/.config/grackle
+cp config.toml.example ~/.config/grackle/config.toml
+# Edit ~/.config/grackle/config.toml with your API key (or export OPENAI_API_KEY)
 
 # Build the project
 cargo build --release
 
 # Install to local bin
 mkdir -p ~/.local/bin
-cp ./target/release/waystt ~/.local/bin/
+cp ./target/release/grackle ~/.local/bin/
 ```
+
+## Acknowledgements
+
+**grackle** is a fork of [**waystt**](https://github.com/sevos/waystt) by
+[Artur Roszczyk (sevos)](https://github.com/sevos), the original Wayland
+speech-to-text daemon this project grew out of. The fork has diverged
+significantly — adding a Unix-socket control client, continuous/streaming
+transcription, local Parakeet/Nemotron backends, and a live transcript UI — and
+has been rebranded as `grackle`. Enormous thanks to Artur for the original work.
+
+Per the GPL, the full upstream history is preserved in this repository and the
+original copyright and license are retained. See [NOTICE](NOTICE) for details.
 
 ## License
 
-Licensed under GPL v3.0 or later. Source code: https://github.com/sevos/waystt
+Licensed under GPL v3.0 or later. Source code: https://github.com/ravinagabhyru/grackle
 
-See [LICENSE](LICENSE) for full terms.
+This project is a fork of waystt (© Artur Roszczyk), also GPL-3.0-or-later;
+the original license and copyright are retained. See [LICENSE](LICENSE) for full
+terms and [NOTICE](NOTICE) for attribution.

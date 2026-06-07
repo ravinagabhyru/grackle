@@ -1,7 +1,7 @@
-# waystt configuration (TOML)
+# grackle configuration (TOML)
 #
-# Copy to ~/.config/waystt/config.toml, then edit. Pass a different path
-# with `waystt --config /path/to/config.toml`. Every value is optional;
+# Copy to ~/.config/grackle/config.toml, then edit. Pass a different path
+# with `grackle --config /path/to/config.toml`. Every value is optional;
 # omitted fields fall back to their built-in defaults.
 #
 # Environment variables override any value set here, so you can keep
@@ -54,13 +54,13 @@ model = "latest_long"
 
 
 [continuous]
-# Tunables for continuous mode (waystt --continuous, or
-# `wayctl continuous-start` against the daemon). All durations are in
+# Tunables for continuous mode (grackle --continuous, or
+# `grackctl continuous-start` against the daemon). All durations are in
 # milliseconds. Env vars CONTINUOUS_MIN_SPEECH_MS, CONTINUOUS_SILENCE_MS,
 # CONTINUOUS_MAX_CHUNK_MS, CONTINUOUS_WORKERS, CONTINUOUS_MAX_QUEUE_SIZE
 # override these.
 #
-# Per-session IPC options from `wayctl continuous-start --silence-ms / --workers`
+# Per-session IPC options from `grackctl continuous-start --silence-ms / --workers`
 # override the file values for that session only.
 #
 # Minimum voiced duration before a chunk can be extracted. Shorter bursts
@@ -89,12 +89,12 @@ max_queue_size = 10
 #          utterance is emitted as a separate final string. EOU is rejected
 #          on the one-shot / stop-and-transcribe path — pick ctc or tdt.
 # "nemotron" - Experimental English streaming backend. Continuous mode feeds
-#          560 ms chunks and waystt's silence detector finalizes utterances.
+#          560 ms chunks and grackle's silence detector finalizes utterances.
 #          One-shot transcription uses Nemotron's batch helper.
 model_type = "eou"
 # Override the default model directory (defaults to
-# ~/.local/share/applications/waystt/parakeet/{model_type}/).
-# Nemotron defaults to ~/.local/share/applications/waystt/parakeet/nemotron/
+# ~/.local/share/applications/grackle/parakeet/{model_type}/).
+# Nemotron defaults to ~/.local/share/applications/grackle/parakeet/nemotron/
 # and requires: encoder.onnx, encoder.onnx.data, decoder_joint.onnx,
 # tokenizer.model from the altunenes/parakeet-rs ONNX layout.
 # model_path = "/path/to/parakeet/model"
@@ -114,7 +114,7 @@ model_type = "eou"
 # emitted unchanged. Requires the `llm-refine` Cargo feature (on by default).
 [llm_refine]
 enabled = false
-# Apply in daemon/batch flows (wayctl transcribe / stop-and-transcribe).
+# Apply in daemon/batch flows (grackctl transcribe / stop-and-transcribe).
 apply_batch = true
 # Apply in continuous / streaming mode. Each utterance incurs one LLM call.
 apply_continuous = true

@@ -2162,6 +2162,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "grackle"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "clap",
+ "cpal",
+ "dirs",
+ "eframe",
+ "futures",
+ "genai",
+ "google-api-proto",
+ "hound",
+ "mockito",
+ "parakeet-rs",
+ "reqwest 0.12.23",
+ "serde",
+ "serde_json",
+ "signal-hook",
+ "signal-hook-tokio",
+ "tempfile",
+ "tokio",
+ "tokio-test",
+ "toml",
+ "tonic",
+ "uuid",
+ "whisper-rs",
+ "yup-oauth2",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5983,38 +6015,6 @@ dependencies = [
  "log",
  "once_cell",
  "pkg-config",
-]
-
-[[package]]
-name = "waystt"
-version = "0.4.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "clap",
- "cpal",
- "dirs",
- "eframe",
- "futures",
- "genai",
- "google-api-proto",
- "hound",
- "mockito",
- "parakeet-rs",
- "reqwest 0.12.23",
- "serde",
- "serde_json",
- "signal-hook",
- "signal-hook-tokio",
- "tempfile",
- "tokio",
- "tokio-test",
- "toml",
- "tonic",
- "uuid",
- "whisper-rs",
- "yup-oauth2",
 ]
 
 [[package]]

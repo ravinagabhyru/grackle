@@ -94,9 +94,9 @@ fn ensure_runtime_dir() -> Result<PathBuf> {
     } else {
         let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
         let user = std::env::var("USER").unwrap_or_else(|_| "user".to_string());
-        PathBuf::from(tmp).join(format!("waystt-{user}"))
+        PathBuf::from(tmp).join(format!("grackle-{user}"))
     };
-    let dir = dir_base.join("waystt");
+    let dir = dir_base.join("grackle");
     std::fs::create_dir_all(&dir)?;
     #[cfg(unix)]
     {
@@ -109,8 +109,8 @@ fn ensure_runtime_dir() -> Result<PathBuf> {
 #[must_use]
 pub fn default_socket_path() -> PathBuf {
     ensure_runtime_dir()
-        .unwrap_or_else(|_| PathBuf::from("/tmp/waystt"))
-        .join("waystt.sock")
+        .unwrap_or_else(|_| PathBuf::from("/tmp/grackle"))
+        .join("grackle.sock")
 }
 
 /// Serve IPC requests on a Unix socket
@@ -135,7 +135,7 @@ pub async fn serve(mut app: App, socket_path: PathBuf) -> Result<()> {
     let listener = UnixListener::bind(&socket_path)
         .map_err(|e| anyhow!("Failed to bind socket {}: {}", socket_path.display(), e))?;
 
-    eprintln!("✅ waystt IPC listening on {}", socket_path.display());
+    eprintln!("✅ grackle IPC listening on {}", socket_path.display());
 
     let audio_notify = app.audio_notify();
 

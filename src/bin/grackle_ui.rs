@@ -7,11 +7,11 @@ use std::thread;
 use std::time::Duration;
 
 use eframe::egui;
-use waystt::ipc::{default_socket_path, OutputMode};
-use waystt::transcript_events::{TranscriptEvent, UiAction};
+use grackle::ipc::{default_socket_path, OutputMode};
+use grackle::transcript_events::{TranscriptEvent, UiAction};
 
 const MAX_FINALS: usize = 200;
-const SUBSCRIBE_REQUEST: &[u8] = b"{\"id\":\"waystt-ui\",\"cmd\":\"continuous_subscribe\"}\n";
+const SUBSCRIBE_REQUEST: &[u8] = b"{\"id\":\"grackle-ui\",\"cmd\":\"continuous_subscribe\"}\n";
 
 #[derive(Debug, Clone)]
 enum Connection {
@@ -55,18 +55,18 @@ impl Default for UiState {
     }
 }
 
-struct WaysttUiApp {
+struct GrackleUiApp {
     state: Arc<Mutex<UiState>>,
 }
 
-impl WaysttUiApp {
+impl GrackleUiApp {
     fn new(state: Arc<Mutex<UiState>>, socket_path: PathBuf, ctx: egui::Context) -> Self {
         spawn_reader_thread(state.clone(), socket_path, ctx);
         Self { state }
     }
 }
 
-impl eframe::App for WaysttUiApp {
+impl eframe::App for GrackleUiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let state = self
             .state
@@ -276,7 +276,7 @@ fn apply_ui_action(state: &Arc<Mutex<UiState>>, ctx: &egui::Context, action: UiA
         // Hide. We send both because compositors honor different requests:
         // GNOME/KDE/X11 honor `Minimized`; `Visible(false)` unmaps where
         // supported. NOTE: tiling Wayland compositors (Sway, Hyprland, river,
-        // niri) ignore BOTH via winit 0.30 — for those, bind the waystt-ui
+        // niri) ignore BOTH via winit 0.30 — for those, bind the grackle-ui
         // window to a compositor scratchpad/special-workspace toggle instead.
         ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
         ctx.send_viewport_cmd(ViewportCommand::Visible(false));
@@ -337,7 +337,7 @@ fn main() -> eframe::Result {
     let socket_path = match parse_socket_arg() {
         Ok(socket_path) => socket_path,
         Err(err) => {
-            eprintln!("waystt-ui: {err}");
+            eprintln!("grackle-ui: {err}");
             std::process::exit(2);
         }
     };
@@ -346,17 +346,17 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([900.0, 600.0])
             // Stable Wayland app_id so compositor window rules can match this
-            // window (e.g. Hyprland `windowrule = ..., class:^(waystt-ui)$`).
-            .with_app_id("waystt-ui")
+            // window (e.g. Hyprland `windowrule = ..., class:^(grackle-ui)$`).
+            .with_app_id("grackle-ui")
             .with_always_on_top(),
         ..Default::default()
     };
 
     eframe::run_native(
-        "waystt — live transcript",
+        "grackle — live transcript",
         native_options,
         Box::new(move |cc| {
-            Ok(Box::new(WaysttUiApp::new(
+            Ok(Box::new(GrackleUiApp::new(
                 state,
                 socket_path,
                 cc.egui_ctx.clone(),

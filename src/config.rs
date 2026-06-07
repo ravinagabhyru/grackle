@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Configuration for waystt loaded from environment variables
+/// Configuration for grackle loaded from environment variables
 #[derive(Debug, Clone)]
 pub struct Config {
     pub openai_api_key: Option<String>,
@@ -324,7 +324,7 @@ impl Config {
     pub fn model_dir() -> PathBuf {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join(".local/share/applications/waystt/models")
+            .join(".local/share/applications/grackle/models")
     }
 
     /// Full path to a model file in the model directory
@@ -338,7 +338,7 @@ impl Config {
     pub fn parakeet_model_dir() -> PathBuf {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join(".local/share/applications/waystt/parakeet")
+            .join(".local/share/applications/grackle/parakeet")
     }
 
     /// Full path to a parakeet model directory based on model type
@@ -658,18 +658,18 @@ pub fn load_config() -> Config {
     Config::from_env()
 }
 
-/// Return the default config path, i.e. `~/.config/waystt/config.toml`.
+/// Return the default config path, i.e. `~/.config/grackle/config.toml`.
 #[must_use]
 pub fn default_config_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| std::env::var("HOME").map_or_else(|_| PathBuf::from("."), PathBuf::from))
-        .join("waystt")
+        .join("grackle")
         .join("config.toml")
 }
 
 /// Bootstrap configuration.
 ///
-/// Loads `~/.config/waystt/config.toml` by default, or the file at
+/// Loads `~/.config/grackle/config.toml` by default, or the file at
 /// `config_path` when provided, then overlays environment variables. Env
 /// vars always win over file values.
 ///
@@ -757,17 +757,17 @@ pub fn validate_bootstrap(cfg: &Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Warn once if the legacy `~/.config/waystt/.env` file exists but the user
+/// Warn once if the legacy `~/.config/grackle/.env` file exists but the user
 /// hasn't created `config.toml` — they almost certainly meant for it to be
 /// loaded and are confused about why it's being ignored.
 fn maybe_warn_legacy_env_file() {
     let legacy = dirs::config_dir()
         .unwrap_or_else(|| std::env::var("HOME").map_or_else(|_| PathBuf::from("."), PathBuf::from))
-        .join("waystt")
+        .join("grackle")
         .join(".env");
     if legacy.exists() {
         eprintln!(
-            "Note: waystt no longer reads {} ; configuration has moved to {}. \
+            "Note: grackle no longer reads {} ; configuration has moved to {}. \
              See config.toml.example for the new format.",
             legacy.display(),
             default_config_path().display()
@@ -824,7 +824,7 @@ mod tests {
     use std::io::Write;
     use tempfile::NamedTempFile;
 
-    // Helper function to clear all waystt environment variables
+    // Helper function to clear all grackle environment variables
     fn clear_env_vars() {
         env::remove_var("OPENAI_API_KEY");
         env::remove_var("OPENAI_BASE_URL");

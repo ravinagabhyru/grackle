@@ -49,7 +49,7 @@ pub const NEMOTRON_REQUIRED_FILES: &[&str] = &[
 
 /// Loaded ONNX model, held across transcription calls. `ort::Session` (inside
 /// both variants) is `Send + Sync`, but `transcribe_samples` takes `&mut self`,
-/// so we serialize callers with a `Mutex`. waystt transcribes one utterance at
+/// so we serialize callers with a `Mutex`. grackle transcribes one utterance at
 /// a time so this contention is expected, not a bottleneck.
 ///
 /// The CTC variant is `Box`ed because its inner struct is ~4x the size of
@@ -166,7 +166,7 @@ impl TranscriptionProvider for ParakeetProvider {
             ));
         }
 
-        if let Ok(dump_path) = std::env::var("WAYSTT_DUMP_WAV") {
+        if let Ok(dump_path) = std::env::var("GRACKLE_DUMP_WAV") {
             match std::fs::write(&dump_path, &audio_data) {
                 Ok(()) => eprintln!(
                     "🎧 Wrote captured WAV to {dump_path} ({} bytes)",

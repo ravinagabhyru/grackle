@@ -1,20 +1,20 @@
 ## Project Overview
 
-waystt is a Wayland speech-to-text tool that emits transcribed text to stdout
+grackle is a Wayland speech-to-text tool that emits transcribed text to stdout
 or a configurable output sink (clipboard / typed keystrokes / piped command).
 It runs in one of two modes:
-- **Daemon** (default): listens on a Unix socket for `wayctl` commands.
-  Hotkeys should call `wayctl stop-and-transcribe` or `wayctl continuous-start`
+- **Daemon** (default): listens on a Unix socket for `grackctl` commands.
+  Hotkeys should call `grackctl stop-and-transcribe` or `grackctl continuous-start`
   instead of sending signals.
-- **Continuous** (`waystt --continuous`): starts capturing audio on launch
+- **Continuous** (`grackle --continuous`): starts capturing audio on launch
   and streams finalized utterances to the configured output until SIGTERM /
   SIGINT / Ctrl-C. When `PARAKEET_MODEL_TYPE=eou`, utterances are segmented
   by the model's own end-of-utterance detection for the lowest latency.
 
 ### Historical note (breaking change)
-waystt previously used SIGUSR1 / SIGUSR2 as a control channel. Those signals
+grackle previously used SIGUSR1 / SIGUSR2 as a control channel. Those signals
 are no longer handled. Any hotkey or script that relied on them must be
-migrated to `wayctl` subcommands. SIGTERM and SIGINT still shut down cleanly.
+migrated to `grackctl` subcommands. SIGTERM and SIGINT still shut down cleanly.
 
 ## Audio Feedback System
 
@@ -105,7 +105,7 @@ async fn test_name() {
 
 ### Running Tests
 - Always set the beep volume to 0, when running tests `BEEP_VOLUME=0.0 cargo test...`
-- When developing/testing, use `--config config.toml` to use the project-local config file instead of ~/.config/waystt/config.toml
+- When developing/testing, use `--config config.toml` to use the project-local config file instead of ~/.config/grackle/config.toml
 - Example: `BEEP_VOLUME=0.0 cargo run -- --config config.toml`
 - Env vars still work and always override file values (handy for secrets like `OPENAI_API_KEY`).
 - **Do not set `CARGO_TARGET_DIR` when invoking `cargo`**. The target directory is
@@ -117,34 +117,34 @@ async fn test_name() {
 
 ## QA Testing Workflow
 
-### Daemon mode (wayctl-controlled)
+### Daemon mode (grackctl-controlled)
 - Launch detached:
   ```bash
-  nohup ./target/release/waystt --config config.toml > /tmp/waystt.log 2>&1 & disown
+  nohup ./target/release/grackle --config config.toml > /tmp/grackle.log 2>&1 & disown
   ```
-- Drive with `wayctl` from a separate shell:
-  - `wayctl start` — begin recording (listen for the start beep)
+- Drive with `grackctl` from a separate shell:
+  - `grackctl start` — begin recording (listen for the start beep)
   - speak a few seconds
-  - `wayctl stop-and-transcribe` — stop + transcribe + emit
-  - or `wayctl transcribe` — auto-detect trailing silence and transcribe
+  - `grackctl stop-and-transcribe` — stop + transcribe + emit
+  - or `grackctl transcribe` — auto-detect trailing silence and transcribe
 - For streaming continuous capture under the daemon:
-  - `wayctl continuous-start` — utterances stream to stdout / clipboard / typed
-  - `wayctl continuous-stop` — flushes and emits stats
-- Tail logs: `tail -f /tmp/waystt.log`
+  - `grackctl continuous-start` — utterances stream to stdout / clipboard / typed
+  - `grackctl continuous-stop` — flushes and emits stats
+- Tail logs: `tail -f /tmp/grackle.log`
 
 ### Continuous mode (no daemon)
 ```bash
-nohup ./target/release/waystt --continuous --config config.toml > /tmp/waystt.log 2>&1 & disown
+nohup ./target/release/grackle --continuous --config config.toml > /tmp/grackle.log 2>&1 & disown
 ```
 - Start beep plays on launch, utterances appear on stdout as they finalize
-- `pkill -SIGTERM waystt` (or Ctrl-C if attached) for clean shutdown — expect
+- `pkill -SIGTERM grackle` (or Ctrl-C if attached) for clean shutdown — expect
   the stop beep and a final stats line
 
 ### Streaming Parakeet smoke test
 1. `transcription_provider = "parakeet"` and `[parakeet] model_type = "eou"` in `config.toml`
 2. Ensure EOU model files (`encoder.onnx`, `decoder_joint.onnx`, `tokenizer.json`)
-   exist under `~/.local/share/applications/waystt/parakeet/eou/`
-3. `waystt --continuous --config config.toml` — expect a single "Pre-loading Parakeet
+   exist under `~/.local/share/applications/grackle/parakeet/eou/`
+3. `grackle --continuous --config config.toml` — expect a single "Pre-loading Parakeet
    EOU model..." log line at startup (warm-up), then instant first-utterance
    latency
 4. Speak two sentences separated by ~1 second of silence; confirm two separate
@@ -157,7 +157,7 @@ Key files for future development:
 - `src/app.rs`: App orchestration (init, continuous run loop, IPC handlers)
 - `src/continuous.rs`: Silence-based batching + streaming-session driver
 - `src/signals.rs`: Lifecycle signals only (SIGTERM, SIGINT)
-- `src/ipc.rs`: Unix-socket daemon protocol for `wayctl`
+- `src/ipc.rs`: Unix-socket daemon protocol for `grackctl`
 - `src/beep.rs`: Musical audio feedback system with CPAL
 - `src/audio.rs`: Audio recording via PipeWire/CPAL
 - `src/config.rs`: Environment variable configuration

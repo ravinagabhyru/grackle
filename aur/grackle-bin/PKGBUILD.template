@@ -1,0 +1,18 @@
+# Maintainer: Ravi Nagabhyru <ravi.nagabhyru@gmail.com>
+# Contributor: Artur Roszczyk <artur.roszczyk@gmail.com> (original waystt author)
+pkgname=grackle-bin
+pkgver=VERSION_PLACEHOLDER
+pkgrel=1
+pkgdesc="Live speech-to-text for Wayland (binary)"
+arch=('x86_64')
+url="https://github.com/ravinagabhyru/grackle"
+license=('GPL-3.0-or-later')
+depends=('gcc-libs' 'glibc' 'alsa-lib' 'openssl' 'pipewire')
+provides=('grackle')
+conflicts=('grackle')
+source=("grackle-linux-x86_64::https://github.com/ravinagabhyru/grackle/releases/download/v${pkgver}/grackle-linux-x86_64")
+sha256sums=('CHECKSUM_PLACEHOLDER')
+
+package() {
+    install -Dm755 "$srcdir/grackle-linux-x86_64" "$pkgdir/usr/bin/grackle"
+}

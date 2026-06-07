@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ipc::OutputMode;
 
-/// Window-visibility action requested of a subscribed UI (e.g. `waystt-ui`).
+/// Window-visibility action requested of a subscribed UI (e.g. `grackle-ui`).
 ///
 /// The daemon does not track UI visibility; `Toggle` is resolved UI-side.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

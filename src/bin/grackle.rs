@@ -1,24 +1,24 @@
 use clap::Parser;
 
-use waystt::cli::{RunMode, RunOptions};
+use grackle::cli::{RunMode, RunOptions};
 
 #[derive(Parser)]
-#[command(name = "waystt")]
+#[command(name = "grackle")]
 #[command(
     about = "Wayland Speech-to-Text Tool - IPC daemon with optional continuous capture mode"
 )]
 #[command(version)]
 struct Args {
     /// Path to a TOML config file. Defaults to
-    /// `~/.config/waystt/config.toml` when present. Environment variables
+    /// `~/.config/grackle/config.toml` when present. Environment variables
     /// override any values set in the file.
     #[arg(long, value_name = "PATH")]
     config: Option<std::path::PathBuf>,
 
     /// Pipe transcribed text to the specified command
-    /// Usage: waystt --pipe-to command args
-    /// Example: waystt --pipe-to wl-copy
-    /// Example: waystt --pipe-to ydotool type --file -
+    /// Usage: grackle --pipe-to command args
+    /// Example: grackle --pipe-to wl-copy
+    /// Example: grackle --pipe-to ydotool type --file -
     #[arg(long, short = 'p', num_args = 1.., value_name = "COMMAND", allow_hyphen_values = true, trailing_var_arg = true)]
     pipe_to: Option<Vec<String>>,
 
@@ -27,8 +27,8 @@ struct Args {
     download_model: bool,
 
     /// Start capturing audio immediately and stream utterances until
-    /// SIGTERM / SIGINT. When omitted, waystt runs as an IPC daemon waiting
-    /// for wayctl commands on its Unix socket.
+    /// SIGTERM / SIGINT. When omitted, grackle runs as an IPC daemon waiting
+    /// for grackctl commands on its Unix socket.
     #[arg(long, short = 'c')]
     continuous: bool,
 }
@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
         mode,
     };
 
-    let code = waystt::run(options).await?;
+    let code = grackle::run(options).await?;
     if code != 0 {
         std::process::exit(code);
     }

@@ -1,7 +1,7 @@
 //! Lifecycle signal utilities.
 //!
-//! waystt previously used Unix user signals as a recording control channel.
-//! That was removed in favour of the `wayctl` Unix-socket IPC.
+//! grackle previously used Unix user signals as a recording control channel.
+//! That was removed in favour of the `grackctl` Unix-socket IPC.
 //! Only lifecycle signals are handled here: SIGTERM (process managers, pkill)
 //! and SIGINT (Ctrl-C) both trigger graceful shutdown.
 

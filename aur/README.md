@@ -1,6 +1,6 @@
 # AUR Publishing Setup
 
-This directory contains the configuration for automated publishing of `waystt-bin` to the Arch User Repository (AUR).
+This directory contains the configuration for automated publishing of `grackle-bin` to the Arch User Repository (AUR).
 
 ## Prerequisites
 
@@ -16,13 +16,13 @@ This directory contains the configuration for automated publishing of `waystt-bi
 The first submission must be done manually:
 1. Clone the AUR repository:
    ```bash
-   git clone ssh://aur@aur.archlinux.org/waystt-bin.git
-   cd waystt-bin
+   git clone ssh://aur@aur.archlinux.org/grackle-bin.git
+   cd grackle-bin
    ```
 2. Copy the generated PKGBUILD:
    ```bash
    # Generate PKGBUILD for current version first
-   cp ../aur/waystt-bin/PKGBUILD.template PKGBUILD
+   cp ../aur/grackle-bin/PKGBUILD.template PKGBUILD
    # Edit VERSION_PLACEHOLDER and CHECKSUM_PLACEHOLDER manually
    ```
 3. Test the package:
@@ -32,7 +32,7 @@ The first submission must be done manually:
 4. Commit and push:
    ```bash
    git add PKGBUILD
-   git commit -m "Initial waystt-bin package"
+   git commit -m "Initial grackle-bin package"
    git push
    ```
 
@@ -46,7 +46,7 @@ Add the following secrets to your GitHub repository at Settings → Secrets and 
 ## How It Works
 
 1. **Release Trigger**: Workflow runs when a GitHub release is published
-2. **Binary Download**: Downloads the pre-built `waystt-linux-x86_64` binary from the release
+2. **Binary Download**: Downloads the pre-built `grackle-linux-x86_64` binary from the release
 3. **Checksum Calculation**: Calculates SHA256 hash of the binary
 4. **PKGBUILD Generation**: Creates PKGBUILD from template with current version and checksum
 5. **AUR Publishing**: Uses KSXGitHub/github-actions-deploy-aur to update the AUR package
@@ -57,12 +57,12 @@ To test the PKGBUILD locally:
 
 ```bash
 # Generate PKGBUILD for a specific version
-cp aur/waystt-bin/PKGBUILD.template PKGBUILD
+cp aur/grackle-bin/PKGBUILD.template PKGBUILD
 sed -i 's/VERSION_PLACEHOLDER/0.1.1/g' PKGBUILD
 
 # Download binary and calculate checksum
-wget -O waystt-linux-x86_64 "https://github.com/sevos/waystt/releases/download/v0.1.1/waystt-linux-x86_64"
-CHECKSUM=$(sha256sum waystt-linux-x86_64 | cut -d' ' -f1)
+wget -O grackle-linux-x86_64 "https://github.com/ravinagabhyru/grackle/releases/download/v0.1.1/grackle-linux-x86_64"
+CHECKSUM=$(sha256sum grackle-linux-x86_64 | cut -d' ' -f1)
 sed -i "s/CHECKSUM_PLACEHOLDER/$CHECKSUM/g" PKGBUILD
 
 # Test build

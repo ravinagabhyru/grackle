@@ -1,4 +1,4 @@
-//! waystt library entrypoint and public exports.
+//! grackle library entrypoint and public exports.
 //!
 //! This crate exposes a library-first API with a thin binary wrapper.
 //! It coordinates configuration bootstrap, provider creation, and running the app.

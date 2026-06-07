@@ -1,10 +1,18 @@
 [package]
-name = "waystt"
+name = "grackle"
 version = "0.4.0"
 edition = "2021"
-description = "Speech-to-text tool for Wayland with stdout output"
+description = "Live speech-to-text for Wayland: a daemon with on-demand and continuous transcription, controlled over a Unix socket"
 license = "GPL-3.0-or-later"
-authors = ["Artur Roszczyk <artur.roszczyk@gmail.com>"]
+authors = [
+    "Ravi Nagabhyru <ravi.nagabhyru@gmail.com>",
+    "Artur Roszczyk <artur.roszczyk@gmail.com> (original waystt author)",
+]
+repository = "https://github.com/ravinagabhyru/grackle"
+homepage = "https://github.com/ravinagabhyru/grackle"
+readme = "README.md"
+keywords = ["wayland", "speech-to-text", "transcription", "voice", "pipewire"]
+categories = ["command-line-utilities", "multimedia::audio"]
 
 [dependencies]
 # Core dependencies (essential)
@@ -57,16 +65,16 @@ tokio-test = "0.4"
 
 
 [[bin]]
-name = "waystt"
-path = "src/bin/waystt.rs"
+name = "grackle"
+path = "src/bin/grackle.rs"
 
 [[bin]]
-name = "wayctl"
-path = "src/bin/wayctl.rs"
+name = "grackctl"
+path = "src/bin/grackctl.rs"
 
 [[bin]]
-name = "waystt-ui"
-path = "src/bin/waystt_ui.rs"
+name = "grackle-ui"
+path = "src/bin/grackle_ui.rs"
 
 [features]
 default = ["parakeet", "llm-refine"]

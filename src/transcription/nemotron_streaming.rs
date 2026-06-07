@@ -1,7 +1,7 @@
 //! Streaming provider for `parakeet-rs` Nemotron.
 //!
 //! Nemotron is a cache-aware English streaming ASR model. Unlike Parakeet EOU,
-//! it does not emit an end-of-utterance marker; waystt keeps using its existing
+//! it does not emit an end-of-utterance marker; grackle keeps using its existing
 //! silence detector to decide when to call `finalize_utterance`.
 
 use std::path::Path;
@@ -147,7 +147,7 @@ impl NemotronSession {
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), TranscriptionError>>();
 
         let handle = thread::Builder::new()
-            .name("waystt-nemotron".into())
+            .name("grackle-nemotron".into())
             .spawn(move || {
                 let mut model = match build_inference() {
                     Ok(model) => {

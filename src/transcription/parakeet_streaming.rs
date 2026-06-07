@@ -312,7 +312,7 @@ impl ParakeetEouSession {
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), TranscriptionError>>();
 
         let handle = thread::Builder::new()
-            .name("waystt-eou".into())
+            .name("grackle-eou".into())
             .spawn(move || {
                 let mut eou = match build_inference() {
                     Ok(eou) => {
