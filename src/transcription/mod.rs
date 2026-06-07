@@ -3,8 +3,6 @@ use std::fmt;
 use std::fmt::Write;
 
 pub mod openai;
-// Secure Google provider using google-api-proto
-pub mod google_v2;
 // Google provider using REST API
 pub mod google_v2_rest;
 // Local whisper provider using whisper-rs

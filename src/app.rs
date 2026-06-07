@@ -2,7 +2,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
-use futures::stream::StreamExt;
 use tokio::sync::broadcast;
 
 use crate::audio::AudioRecorder;
@@ -122,7 +121,7 @@ impl App {
             return Ok(1);
         }
 
-        let mut signals = signals::build_signal_stream()?;
+        let mut signals = signals::ShutdownSignals::new()?;
         let audio_notify = self.recorder.audio_notify();
 
         loop {
@@ -131,17 +130,9 @@ impl App {
             }
 
             tokio::select! {
-                maybe_sig = signals.next() => {
-                    match maybe_sig {
-                        Some(sig) if signals::is_shutdown_signal(sig) => {
-                            eprintln!("Received shutdown signal: exiting continuous mode");
-                            break;
-                        }
-                        Some(other) => {
-                            eprintln!("Ignoring unexpected signal: {other}");
-                        }
-                        None => break,
-                    }
+                _ = signals.recv() => {
+                    eprintln!("Received shutdown signal: exiting continuous mode");
+                    break;
                 }
                 // Wake immediately when CPAL delivers a new audio buffer.
                 () = audio_notify.notified() => {

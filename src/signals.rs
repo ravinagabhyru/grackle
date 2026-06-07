@@ -5,24 +5,38 @@
 //! Only lifecycle signals are handled here: SIGTERM (process managers, pkill)
 //! and SIGINT (Ctrl-C) both trigger graceful shutdown.
 
-pub const SHUTDOWN_SIG: i32 = signal_hook::consts::SIGTERM;
+use tokio::signal::unix::{signal, Signal, SignalKind};
 
-/// Build a signal stream for async handling of lifecycle signals.
+/// Streams for the lifecycle shutdown signals (SIGTERM and SIGINT).
 ///
-/// Registers SIGTERM and SIGINT. Both are treated as shutdown requests and
-/// surface through the returned stream.
-///
-/// # Errors
-///
-/// Returns an error if signal registration fails.
-pub fn build_signal_stream() -> anyhow::Result<signal_hook_tokio::Signals> {
-    use signal_hook::consts::signal::{SIGINT, SIGTERM};
-    let signals = signal_hook_tokio::Signals::new([SIGINT, SIGTERM])?;
-    Ok(signals)
+/// Both signals are treated as shutdown requests; callers should `select!`
+/// over [`ShutdownSignals::recv`] alongside their other work.
+pub struct ShutdownSignals {
+    sigterm: Signal,
+    sigint: Signal,
 }
 
-/// Returns true if `sig` is a lifecycle shutdown signal (SIGTERM or SIGINT).
-#[must_use]
-pub fn is_shutdown_signal(sig: i32) -> bool {
-    sig == signal_hook::consts::SIGTERM || sig == signal_hook::consts::SIGINT
+impl ShutdownSignals {
+    /// Register handlers for SIGTERM and SIGINT.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signal registration fails.
+    pub fn new() -> std::io::Result<Self> {
+        Ok(Self {
+            sigterm: signal(SignalKind::terminate())?,
+            sigint: signal(SignalKind::interrupt())?,
+        })
+    }
+
+    /// Resolve when either SIGTERM or SIGINT is delivered.
+    ///
+    /// Returns `None` only if both underlying signal streams are closed, which
+    /// does not happen in practice for process-lifetime handlers.
+    pub async fn recv(&mut self) -> Option<()> {
+        tokio::select! {
+            v = self.sigterm.recv() => v,
+            v = self.sigint.recv() => v,
+        }
+    }
 }
