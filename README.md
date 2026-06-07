@@ -295,15 +295,37 @@ model_type = "ctc"        # "ctc", "tdt", "eou", or "nemotron"
 
 #### Choosing a model type
 
-| `model_type` | Languages | Mode | Best for |
-|--------------|-----------|------|----------|
-| `ctc`  | English | batch / one-shot | Fast push-to-talk dictation (`grackctl transcribe`) |
-| `tdt`  | Multilingual (25 langs) | batch / one-shot | Non-English or mixed-language dictation |
-| `eou`  | English | streaming | Continuous mode with lowest latency (model detects end-of-utterance) |
-| `nemotron` | English | streaming (experimental) | Continuous mode; grackle's silence detector finalizes utterances |
+| `model_type` | Languages | Mode | Params | Best for |
+|--------------|-----------|------|--------|----------|
+| `ctc`  | English | batch / one-shot | ~0.6B | Fast push-to-talk dictation (`grackctl transcribe`) |
+| `tdt`  | Multilingual (25 langs) | batch / one-shot | ~0.6B | Non-English or mixed-language dictation |
+| `eou`  | English | streaming | ~0.12B | Continuous mode on low-RAM / weak-CPU hardware |
+| `nemotron` | English | streaming (experimental) | ~0.6B | Continuous mode with the best accuracy and live partials |
 
 - `eou` is rejected on the one-shot / stop-and-transcribe path — use `ctc` or `tdt` there.
 - `nemotron` requires the ONNX layout from `altunenes/parakeet-rs`, **not** NVIDIA's `.nemo` repository layout.
+
+#### Streaming: `eou` vs `nemotron`
+
+Both streaming backends are driven by grackle's own silence detector to decide
+where one utterance ends and the next begins (`silence_threshold_ms` in the
+`[continuous]` section). `eou` *can* emit its own end-of-utterance marker, but
+grackle does **not** use it — the upstream author found that path unreliable, so
+in practice `eou` and `nemotron` segment utterances identically.
+
+That leaves model size as the real difference:
+
+- **`nemotron` (~0.6B)** — higher accuracy and the only streaming backend that
+  feeds live partial hypotheses to the `grackle-ui` window. Heavier on RAM/CPU
+  and a larger download. Recommended when your hardware can keep up.
+- **`eou` (~0.12B)** — roughly 5× smaller, so it stays real-time on older
+  laptops / SBCs and downloads quickly. Lower accuracy and no live partials.
+
+> **Deprecation note:** Because `eou`'s end-of-utterance detection is unused,
+> its only remaining advantage over `nemotron` is its smaller footprint. Once
+> `nemotron` graduates from "experimental," `eou` may be **deprecated and
+> removed** in a future release. If you rely on it for low-resource hardware,
+> please open an issue so that use case is taken into account.
 
 #### Downloading the models
 
@@ -341,7 +363,7 @@ curl -L -o "$DIR/encoder-model.onnx.data"  "$base/encoder-model.onnx.data"
 curl -L -o "$DIR/decoder_joint-model.onnx" "$base/decoder_joint-model.onnx"
 curl -L -o "$DIR/vocab.txt"                "$base/vocab.txt"
 
-# eou (English, streaming — recommended for continuous mode)
+# eou (English, streaming — lightweight option for low-resource hardware)
 DIR=~/.local/share/applications/grackle/parakeet/eou; mkdir -p "$DIR"
 base=https://huggingface.co/altunenes/parakeet-rs/resolve/main/realtime_eou_120m-v1-onnx
 curl -L -o "$DIR/encoder.onnx"       "$base/encoder.onnx"
