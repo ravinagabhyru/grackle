@@ -81,8 +81,7 @@ pub trait EouInference: Send {
     /// `encoder_cache` and `audio_buffer` (see `parakeet_eou.rs:192-200`).
     /// Used at finalize time to break cross-utterance decoder-state leakage
     /// without paying a full model reload and its MIN_BUFFER_SAMPLES warm-up.
-    fn transcribe_chunk_reset(&mut self, chunk: &[f32])
-        -> Result<String, TranscriptionError>;
+    fn transcribe_chunk_reset(&mut self, chunk: &[f32]) -> Result<String, TranscriptionError>;
 
     /// Discard internal decoder/encoder state and start fresh by rebuilding
     /// the model from disk. Retained for completeness but no longer called
@@ -141,10 +140,7 @@ impl EouInference for RealEou {
         })
     }
 
-    fn transcribe_chunk_reset(
-        &mut self,
-        chunk: &[f32],
-    ) -> Result<String, TranscriptionError> {
+    fn transcribe_chunk_reset(&mut self, chunk: &[f32]) -> Result<String, TranscriptionError> {
         self.model.transcribe(chunk, true).map_err(|e| {
             TranscriptionError::ApiError(ApiErrorDetails {
                 provider: "Parakeet (EOU)".to_string(),
@@ -332,13 +328,11 @@ impl ParakeetEouSession {
                 ))
             })?;
 
-        ready_rx
-            .await
-            .map_err(|_| {
-                TranscriptionError::ConfigurationError(
-                    "EOU worker thread terminated before reporting readiness".to_string(),
-                )
-            })??;
+        ready_rx.await.map_err(|_| {
+            TranscriptionError::ConfigurationError(
+                "EOU worker thread terminated before reporting readiness".to_string(),
+            )
+        })??;
 
         Ok(Self {
             cmd_tx,
@@ -366,9 +360,7 @@ impl ParakeetEouSession {
                 reply: reply_tx,
             })
             .map_err(|_| {
-                TranscriptionError::ConfigurationError(
-                    "EOU worker thread has exited".to_string(),
-                )
+                TranscriptionError::ConfigurationError("EOU worker thread has exited".to_string())
             })?;
         reply_rx.await.map_err(|_| {
             TranscriptionError::ConfigurationError(
@@ -382,9 +374,7 @@ impl ParakeetEouSession {
         self.cmd_tx
             .send(Cmd::Finalize { reply: reply_tx })
             .map_err(|_| {
-                TranscriptionError::ConfigurationError(
-                    "EOU worker thread has exited".to_string(),
-                )
+                TranscriptionError::ConfigurationError("EOU worker thread has exited".to_string())
             })?;
         reply_rx.await.map_err(|_| {
             TranscriptionError::ConfigurationError(
@@ -409,10 +399,7 @@ impl Drop for ParakeetEouSession {
 
 #[async_trait]
 impl StreamingSession for ParakeetEouSession {
-    async fn push_samples(
-        &mut self,
-        samples: &[f32],
-    ) -> Result<String, TranscriptionError> {
+    async fn push_samples(&mut self, samples: &[f32]) -> Result<String, TranscriptionError> {
         self.carry_over.extend_from_slice(samples);
         let mut completed = String::new();
 
@@ -606,10 +593,7 @@ mod tests {
             }
         }
 
-        fn transcribe_chunk_reset(
-            &mut self,
-            chunk: &[f32],
-        ) -> Result<String, TranscriptionError> {
+        fn transcribe_chunk_reset(&mut self, chunk: &[f32]) -> Result<String, TranscriptionError> {
             self.received_chunks.lock().unwrap().push(chunk.to_vec());
             *self.soft_reset_calls.lock().unwrap() += 1;
             if self.responses.is_empty() {
@@ -704,11 +688,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_push_samples_dispatches_multiple_chunks() {
-        let (mut session, handles) = stub_session(vec![
-            Ok("a".to_string()),
-            Ok("b".to_string()),
-        ])
-        .await;
+        let (mut session, handles) =
+            stub_session(vec![Ok("a".to_string()), Ok("b".to_string())]).await;
         // Two and a half chunks worth.
         let n = EOU_CHUNK_SAMPLES * 2 + EOU_CHUNK_SAMPLES / 2;
         let samples = vec![0.3f32; n];

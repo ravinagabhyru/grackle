@@ -4,9 +4,7 @@ use grackle::cli::{RunMode, RunOptions};
 
 #[derive(Parser)]
 #[command(name = "grackle")]
-#[command(
-    about = "Wayland Speech-to-Text Tool - IPC daemon with optional continuous capture mode"
-)]
+#[command(about = "Wayland Speech-to-Text Tool - IPC daemon with optional continuous capture mode")]
 #[command(version)]
 struct Args {
     /// Path to a TOML config file. Defaults to

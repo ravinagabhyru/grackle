@@ -254,14 +254,14 @@ fn load_model(
         ParakeetModelType::CTC => {
             let model = parakeet_rs::Parakeet::from_pretrained(model_path_str, Some(exec_config))
                 .map_err(|e| {
-                    TranscriptionError::ApiError(ApiErrorDetails {
-                        provider: "Parakeet".to_string(),
-                        status_code: None,
-                        error_code: Some("MODEL_LOAD_ERROR".to_string()),
-                        error_message: format!("Failed to load CTC model: {e}"),
-                        raw_response: None,
-                    })
-                })?;
+                TranscriptionError::ApiError(ApiErrorDetails {
+                    provider: "Parakeet".to_string(),
+                    status_code: None,
+                    error_code: Some("MODEL_LOAD_ERROR".to_string()),
+                    error_message: format!("Failed to load CTC model: {e}"),
+                    raw_response: None,
+                })
+            })?;
             Ok(CachedModel::Ctc(Box::new(model)))
         }
         ParakeetModelType::TDT => {
@@ -282,14 +282,14 @@ fn load_model(
             validate_nemotron_model_dir(model_path)?;
             let model = parakeet_rs::Nemotron::from_pretrained(model_path_str, Some(exec_config))
                 .map_err(|e| {
-                    TranscriptionError::ApiError(ApiErrorDetails {
-                        provider: "Parakeet (Nemotron)".to_string(),
-                        status_code: None,
-                        error_code: Some("MODEL_LOAD_ERROR".to_string()),
-                        error_message: format!("Failed to load Nemotron model: {e}"),
-                        raw_response: None,
-                    })
-                })?;
+                TranscriptionError::ApiError(ApiErrorDetails {
+                    provider: "Parakeet (Nemotron)".to_string(),
+                    status_code: None,
+                    error_code: Some("MODEL_LOAD_ERROR".to_string()),
+                    error_message: format!("Failed to load Nemotron model: {e}"),
+                    raw_response: None,
+                })
+            })?;
             Ok(CachedModel::Nemotron(Box::new(model)))
         }
         ParakeetModelType::EOU => Err(TranscriptionError::ConfigurationError(

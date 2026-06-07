@@ -476,9 +476,7 @@ async fn dispatch_request(app: &mut App, req: IpcRequest) -> IpcResponse {
                 "ui_hide" => UiAction::Hide,
                 _ => UiAction::Toggle,
             };
-            app.event_sender()
-                .send(TranscriptEvent::Ui { action })
-                .ok();
+            app.event_sender().send(TranscriptEvent::Ui { action }).ok();
             IpcResponse {
                 id,
                 ok: true,
