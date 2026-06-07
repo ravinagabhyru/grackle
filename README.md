@@ -9,12 +9,15 @@ Press a keybind, speak, and get instant text output. A speech-to-text tool that 
 - **On-demand transcription**: `grackctl transcribe` records until trailing silence and prints/copies/types the result
 - **Audio feedback**: Beeps confirm recording start/stop and success
 - **Wayland native**: Works with modern Linux desktops (Hyprland, Niri, etc.)
-- **Optional local transcription**: Run Whisper locally using whisper-rs
+- **Fully local by default**: Parakeet ONNX models run on-device — no API key, no network
+- **Pluggable backends**: Parakeet (local, default), OpenAI Whisper, Google Speech-to-Text, or local Whisper (whisper-rs)
 
 ## Requirements
 
 - **Wayland desktop** (Hyprland, Niri, GNOME, KDE, etc.)
-- **OpenAI API key** (for Whisper transcription)
+- **A transcription backend**: the default Parakeet provider runs locally (just
+  download the model — see [Configuration](#configuration)). Only the OpenAI and
+  Google providers need an API key / credentials.
 - **System packages**:
 
 ```bash
@@ -112,7 +115,8 @@ grackctl transcribe --silence-ms 5000
 ### Common Commands
 
 ```bash
-# Download local model and exit
+# Download a local Whisper GGML model and exit (whisper-rs `local` provider only;
+# Parakeet models are downloaded manually — see Configuration)
 grackle --download-model
 
 # Start daemon in a terminal
@@ -221,6 +225,12 @@ Run a long-lived daemon and control it with `grackctl`.
 - `grackctl stop [--output stdout|clipboard|type]` → stop + transcribe
 - `grackctl transcribe [--silence-ms 3000] [--output ...]` → auto-start, stop after trailing silence, transcribe
 - `grackctl cancel` → stop without transcription
+- `grackctl continuous-start [--silence-ms 700] [--workers 1-4] [--output ...] [--ui]` → stream utterances as they finalize
+- `grackctl continuous-stop [--ui]` → flush, stop streaming, emit stats
+- `grackctl continuous-status` → report whether continuous mode is active
+- `grackctl ui-show` / `ui-hide` / `ui-toggle` → control the live-transcript window
+
+The `--output` modes also accept `--type-newlines spaces|enter|literal` to choose how newlines are rendered when typing.
 
 ### Output modes
 - `stdout` (default): print text to grackctl stdout
@@ -271,26 +281,86 @@ See [`config.toml.example`](config.toml.example) for the full annotated template
 
 grackle supports four transcription providers: **Parakeet** (local ONNX, default), **OpenAI Whisper**, **Google Speech-to-Text**, and **local Whisper** (whisper-rs).
 
-### Parakeet / Nemotron ONNX
+### Parakeet / Nemotron ONNX (default, fully local)
 
-Parakeet runs locally through `parakeet-rs`. Configure it under `[parakeet]`:
+Parakeet runs entirely on-device through [`parakeet-rs`](https://github.com/altunenes/parakeet-rs) — no API key, no network at runtime. It is the provider set in the bundled [`config.toml.example`](config.toml.example):
 
 ```toml
 transcription_provider = "parakeet"
 
 [parakeet]
 model_type = "ctc"        # "ctc", "tdt", "eou", or "nemotron"
-# model_path = "/path/to/model"
+# model_path = "/path/to/model"   # override the default directory
 ```
 
-Default model directories follow `~/.local/share/applications/grackle/parakeet/{model_type}/`.
+#### Choosing a model type
 
-- `ctc`: English batch / one-shot transcription.
-- `tdt`: multilingual batch / one-shot transcription.
-- `eou`: English streaming with model end-of-utterance detection.
-- `nemotron`: experimental English streaming backend. Continuous mode feeds 560 ms chunks and grackle finalizes utterances on its existing silence detector. One-shot transcription uses `Nemotron::transcribe_audio()`.
+| `model_type` | Languages | Mode | Best for |
+|--------------|-----------|------|----------|
+| `ctc`  | English | batch / one-shot | Fast push-to-talk dictation (`grackctl transcribe`) |
+| `tdt`  | Multilingual (25 langs) | batch / one-shot | Non-English or mixed-language dictation |
+| `eou`  | English | streaming | Continuous mode with lowest latency (model detects end-of-utterance) |
+| `nemotron` | English | streaming (experimental) | Continuous mode; grackle's silence detector finalizes utterances |
 
-Nemotron requires the ONNX layout from `altunenes/parakeet-rs`, not NVIDIA's `.nemo` repository layout. Put these files in `~/.local/share/applications/grackle/parakeet/nemotron/` or set `[parakeet].model_path`: `encoder.onnx`, `encoder.onnx.data`, `decoder_joint.onnx`, `tokenizer.model`.
+- `eou` is rejected on the one-shot / stop-and-transcribe path — use `ctc` or `tdt` there.
+- `nemotron` requires the ONNX layout from `altunenes/parakeet-rs`, **not** NVIDIA's `.nemo` repository layout.
+
+#### Downloading the models
+
+`grackle --download-model` only fetches Whisper GGML models for the `local`
+provider — it does **not** download Parakeet models. Parakeet models are
+downloaded manually from Hugging Face into per-type directories under
+`~/.local/share/applications/grackle/parakeet/{model_type}/` (or wherever
+`[parakeet].model_path` points). The filenames below are what `parakeet-rs`
+looks for, so place the files exactly as named.
+
+| `model_type` | Hugging Face source | Files (placed flat in the model dir) |
+|--------------|---------------------|--------------------------------------|
+| `ctc`  | [`onnx-community/parakeet-ctc-0.6b-ONNX`](https://huggingface.co/onnx-community/parakeet-ctc-0.6b-ONNX) | `model.onnx`, `model.onnx_data`, `tokenizer.json` |
+| `tdt`  | [`istupakov/parakeet-tdt-0.6b-v3-onnx`](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx) | `encoder-model.onnx`, `encoder-model.onnx.data`, `decoder_joint-model.onnx`, `vocab.txt` |
+| `eou`  | [`altunenes/parakeet-rs`](https://huggingface.co/altunenes/parakeet-rs) → `realtime_eou_120m-v1-onnx/` | `encoder.onnx`, `decoder_joint.onnx`, `tokenizer.json` |
+| `nemotron` | [`altunenes/parakeet-rs`](https://huggingface.co/altunenes/parakeet-rs) → `nemotron-speech-streaming-en-0.6b/` | `encoder.onnx`, `encoder.onnx.data`, `decoder_joint.onnx`, `tokenizer.model` |
+
+The models are licensed CC-BY-4.0 by NVIDIA; `parakeet-rs` does not redistribute them.
+
+**Example downloads** (using `curl`; substitute the rows above for other types):
+
+```bash
+# ctc (English, one-shot) — note the files live under onnx/ in the repo
+DIR=~/.local/share/applications/grackle/parakeet/ctc; mkdir -p "$DIR"
+base=https://huggingface.co/onnx-community/parakeet-ctc-0.6b-ONNX/resolve/main
+curl -L -o "$DIR/model.onnx"      "$base/onnx/model.onnx"
+curl -L -o "$DIR/model.onnx_data" "$base/onnx/model.onnx_data"
+curl -L -o "$DIR/tokenizer.json"  "$base/tokenizer.json"
+
+# tdt (multilingual, one-shot)
+DIR=~/.local/share/applications/grackle/parakeet/tdt; mkdir -p "$DIR"
+base=https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main
+curl -L -o "$DIR/encoder-model.onnx"       "$base/encoder-model.onnx"
+curl -L -o "$DIR/encoder-model.onnx.data"  "$base/encoder-model.onnx.data"
+curl -L -o "$DIR/decoder_joint-model.onnx" "$base/decoder_joint-model.onnx"
+curl -L -o "$DIR/vocab.txt"                "$base/vocab.txt"
+
+# eou (English, streaming — recommended for continuous mode)
+DIR=~/.local/share/applications/grackle/parakeet/eou; mkdir -p "$DIR"
+base=https://huggingface.co/altunenes/parakeet-rs/resolve/main/realtime_eou_120m-v1-onnx
+curl -L -o "$DIR/encoder.onnx"       "$base/encoder.onnx"
+curl -L -o "$DIR/decoder_joint.onnx" "$base/decoder_joint.onnx"
+curl -L -o "$DIR/tokenizer.json"     "$base/tokenizer.json"
+
+# nemotron (English, streaming, experimental)
+DIR=~/.local/share/applications/grackle/parakeet/nemotron; mkdir -p "$DIR"
+base=https://huggingface.co/altunenes/parakeet-rs/resolve/main/nemotron-speech-streaming-en-0.6b
+curl -L -o "$DIR/encoder.onnx"       "$base/encoder.onnx"
+curl -L -o "$DIR/encoder.onnx.data"  "$base/encoder.onnx.data"
+curl -L -o "$DIR/decoder_joint.onnx" "$base/decoder_joint.onnx"
+curl -L -o "$DIR/tokenizer.model"    "$base/tokenizer.model"
+```
+
+> The Hugging Face repos also ship quantized variants (`*_int8.onnx`, etc.).
+> The CTC loader auto-discovers `model_fp16.onnx` / `model_int8.onnx` / `model_q4.onnx`
+> if `model.onnx` is absent, and TDT accepts `*-model.int8.onnx` — handy for
+> smaller, faster (slightly less accurate) models on constrained hardware.
 
 ### OpenAI Whisper
 
@@ -366,7 +436,7 @@ Download with `grackle --download-model`.
 - **For accuracy**: `ggml-large-v3.bin` or `ggml-medium.en.bin`
 - **For balance**: `ggml-base.en.bin` (default)
 
-If the configured model is missing, the application will exit with an error. OpenAI remains the default provider.
+If the configured model is missing, the application will exit with an error.
 
 **Popular Google language codes:**
 - `en-US` - English (United States)
