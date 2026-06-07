@@ -1,0 +1,18 @@
+# cargo-audit configuration.
+#
+# These advisories are all UNMAINTAINED / unsoundness warnings (not exploitable
+# vulnerabilities) coming from transitive dependencies that grackle cannot
+# remove or upgrade away — there is no patched version and no maintained
+# replacement reachable in our tree. They are ignored here so `cargo audit`
+# stays quiet while still failing on real vulnerabilities. Revisit when the
+# upstreams (tokenizers / parakeet-rs, tonic / yup-oauth2) update.
+[advisories]
+ignore = [
+    # `paste` unmaintained — transitive via tokenizers -> parakeet-rs.
+    "RUSTSEC-2024-0436",
+    # `rustls-pemfile` unmaintained — transitive via tonic / yup-oauth2.
+    "RUSTSEC-2025-0134",
+    # `rand` unsound only with a custom logger using `rand::rng()` (not our
+    # usage) — transitive via mockito (dev) and tokenizers.
+    "RUSTSEC-2026-0097",
+]
