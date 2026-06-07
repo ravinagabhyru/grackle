@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::ipc::OutputMode;
 
+/// Window-visibility action requested of a subscribed UI (e.g. `waystt-ui`).
+///
+/// The daemon does not track UI visibility; `Toggle` is resolved UI-side.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum UiAction {
+    Show,
+    Hide,
+    Toggle,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TranscriptEvent {
@@ -22,6 +33,9 @@ pub enum TranscriptEvent {
         state: String,
         provider: String,
         model: String,
+    },
+    Ui {
+        action: UiAction,
     },
 }
 
@@ -67,6 +81,28 @@ mod tests {
                 model: "parakeet-nemotron".to_string(),
             },
             r#"{"type":"state","state":"ContinuousRunning","provider":"Parakeet","model":"parakeet-nemotron"}"#,
+        );
+    }
+
+    #[test]
+    fn transcript_event_ui_serializes_exact_json_shapes() {
+        assert_round_trip(
+            TranscriptEvent::Ui {
+                action: UiAction::Show,
+            },
+            r#"{"type":"ui","action":"show"}"#,
+        );
+        assert_round_trip(
+            TranscriptEvent::Ui {
+                action: UiAction::Hide,
+            },
+            r#"{"type":"ui","action":"hide"}"#,
+        );
+        assert_round_trip(
+            TranscriptEvent::Ui {
+                action: UiAction::Toggle,
+            },
+            r#"{"type":"ui","action":"toggle"}"#,
         );
     }
 }

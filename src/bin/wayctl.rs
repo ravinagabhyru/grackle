@@ -58,13 +58,29 @@ enum Commands {
         output: OutputMode,
         #[arg(long, value_enum, default_value_t = TypeNewlines::Spaces)]
         type_newlines: TypeNewlines,
+        /// Also show the waystt-ui window (live partials)
+        #[arg(long)]
+        ui: bool,
     },
     /// Stop continuous speech recognition mode
     #[command(name = "continuous-stop")]
-    ContinuousStop,
+    ContinuousStop {
+        /// Also hide the waystt-ui window
+        #[arg(long)]
+        ui: bool,
+    },
     /// Get continuous mode status
     #[command(name = "continuous-status")]
     ContinuousStatus,
+    /// Show the waystt-ui window
+    #[command(name = "ui-show")]
+    UiShow,
+    /// Hide (background) the waystt-ui window
+    #[command(name = "ui-hide")]
+    UiHide,
+    /// Toggle the waystt-ui window visibility
+    #[command(name = "ui-toggle")]
+    UiToggle,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -132,6 +148,7 @@ async fn main() -> Result<()> {
             workers,
             output,
             type_newlines,
+            ui,
         } => {
             let mut opts = serde_json::Map::new();
             opts.insert("output".into(), serde_json::Value::String(to_lower(output)));
@@ -145,10 +162,22 @@ async fn main() -> Result<()> {
             if let Some(w) = workers {
                 opts.insert("continuous_workers".into(), serde_json::Value::from(w));
             }
+            if ui {
+                opts.insert("ui".into(), serde_json::Value::Bool(true));
+            }
             ("continuous_start", serde_json::Value::Object(opts))
         }
-        Commands::ContinuousStop => ("continuous_stop", json!({})),
+        Commands::ContinuousStop { ui } => {
+            let mut opts = serde_json::Map::new();
+            if ui {
+                opts.insert("ui".into(), serde_json::Value::Bool(true));
+            }
+            ("continuous_stop", serde_json::Value::Object(opts))
+        }
         Commands::ContinuousStatus => ("continuous_status", json!({})),
+        Commands::UiShow => ("ui_show", json!({})),
+        Commands::UiHide => ("ui_hide", json!({})),
+        Commands::UiToggle => ("ui_toggle", json!({})),
     };
 
     let id = Uuid::new_v4().to_string();
@@ -222,13 +251,10 @@ fn handle_response(v: &serde_json::Value) -> Result<()> {
         if duration > 0 {
             println!("duration_ms: {duration}");
         }
-    } else {
-        // Fallback: print the raw JSON result for visibility
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&result).unwrap_or_default()
-        );
     }
+    // Otherwise the command succeeded with no status to report (e.g. ui-show /
+    // ui-hide / ui-toggle, which return an empty result). Stay quiet rather than
+    // dumping an all-empty JSON object.
     Ok(())
 }
 

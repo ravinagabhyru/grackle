@@ -7,7 +7,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::broadcast;
 
 use crate::app::App;
-use crate::transcript_events::TranscriptEvent;
+use crate::transcript_events::{TranscriptEvent, UiAction};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -43,6 +43,9 @@ pub struct IpcOptions {
     /// Number of parallel transcription workers for continuous mode (1-4)
     #[serde(default)]
     pub continuous_workers: Option<u32>,
+    /// When true, continuous start/stop also shows/hides a subscribed UI window
+    #[serde(default)]
+    pub ui: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -383,38 +386,58 @@ async fn dispatch_request(app: &mut App, req: IpcRequest) -> IpcResponse {
         }
         "continuous_start" => {
             // Start continuous speech recognition mode
+            let show_ui = opts.ui;
             match app.ipc_continuous_start(opts).await {
-                Ok(()) => IpcResponse {
-                    id,
-                    ok: true,
-                    result: Some(IpcResult {
-                        state: "Continuous".to_string(),
-                        ..IpcResult::default()
-                    }),
-                    error: None,
-                },
+                Ok(()) => {
+                    if show_ui {
+                        app.event_sender()
+                            .send(TranscriptEvent::Ui {
+                                action: UiAction::Show,
+                            })
+                            .ok();
+                    }
+                    IpcResponse {
+                        id,
+                        ok: true,
+                        result: Some(IpcResult {
+                            state: "Continuous".to_string(),
+                            ..IpcResult::default()
+                        }),
+                        error: None,
+                    }
+                }
                 Err(e) => fail("invalid_state", e.to_string()),
             }
         }
         "continuous_stop" => {
             // Stop continuous mode and return stats
+            let hide_ui = opts.ui;
             match app.ipc_continuous_stop().await {
-                Ok(stats) => IpcResponse {
-                    id,
-                    ok: true,
-                    result: Some(IpcResult {
-                        state: "Idle".to_string(),
-                        text: format!(
-                            "Captured {} chunks, transcribed {}, failed {}, total {:.1}s audio",
-                            stats.chunks_captured,
-                            stats.chunks_transcribed,
-                            stats.chunks_failed,
-                            stats.total_audio_seconds
-                        ),
-                        ..IpcResult::default()
-                    }),
-                    error: None,
-                },
+                Ok(stats) => {
+                    if hide_ui {
+                        app.event_sender()
+                            .send(TranscriptEvent::Ui {
+                                action: UiAction::Hide,
+                            })
+                            .ok();
+                    }
+                    IpcResponse {
+                        id,
+                        ok: true,
+                        result: Some(IpcResult {
+                            state: "Idle".to_string(),
+                            text: format!(
+                                "Captured {} chunks, transcribed {}, failed {}, total {:.1}s audio",
+                                stats.chunks_captured,
+                                stats.chunks_transcribed,
+                                stats.chunks_failed,
+                                stats.total_audio_seconds
+                            ),
+                            ..IpcResult::default()
+                        }),
+                        error: None,
+                    }
+                }
                 Err(e) => fail("invalid_state", e.to_string()),
             }
         }
@@ -441,6 +464,25 @@ async fn dispatch_request(app: &mut App, req: IpcRequest) -> IpcResponse {
                     model: app.ipc_status().model,
                     ..IpcResult::default()
                 }),
+                error: None,
+            }
+        }
+        "ui_show" | "ui_hide" | "ui_toggle" => {
+            // Broadcast a UI visibility action. No-op if no UI is subscribed
+            // (a broadcast with no receivers simply drops). The daemon does not
+            // track UI visibility; `toggle` is resolved UI-side.
+            let action = match cmd {
+                "ui_show" => UiAction::Show,
+                "ui_hide" => UiAction::Hide,
+                _ => UiAction::Toggle,
+            };
+            app.event_sender()
+                .send(TranscriptEvent::Ui { action })
+                .ok();
+            IpcResponse {
+                id,
+                ok: true,
+                result: Some(IpcResult::default()),
                 error: None,
             }
         }

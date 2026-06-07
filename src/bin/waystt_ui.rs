@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use eframe::egui;
 use waystt::ipc::{default_socket_path, OutputMode};
-use waystt::transcript_events::TranscriptEvent;
+use waystt::transcript_events::{TranscriptEvent, UiAction};
 
 const MAX_FINALS: usize = 200;
 const SUBSCRIBE_REQUEST: &[u8] = b"{\"id\":\"waystt-ui\",\"cmd\":\"continuous_subscribe\"}\n";
@@ -36,6 +36,8 @@ struct UiState {
     partial: String,
     finals: Vec<FinalEntry>,
     last_error: Option<String>,
+    /// Tracked window visibility; `Toggle` is resolved against this flag.
+    visible: bool,
 }
 
 impl Default for UiState {
@@ -48,6 +50,7 @@ impl Default for UiState {
             partial: String::new(),
             finals: Vec::new(),
             last_error: None,
+            visible: true,
         }
     }
 }
@@ -173,7 +176,15 @@ fn spawn_reader_thread(state: Arc<Mutex<UiState>>, socket_path: PathBuf, ctx: eg
                     match line {
                         Ok(line) => {
                             if let Ok(event) = serde_json::from_str::<TranscriptEvent>(&line) {
-                                update_state(&state, &ctx, |state| apply_event(state, event));
+                                // `Ui` events drive the window via viewport commands,
+                                // which need the `egui::Context` in scope here (the
+                                // `apply_event` state mutation has no `ctx`). All other
+                                // events flow through `apply_event` unchanged.
+                                if let TranscriptEvent::Ui { action } = event {
+                                    apply_ui_action(&state, &ctx, action);
+                                } else {
+                                    update_state(&state, &ctx, |state| apply_event(state, event));
+                                }
                             }
                         }
                         Err(err) => {
@@ -234,7 +245,47 @@ fn apply_event(state: &mut UiState, event: TranscriptEvent) {
             state.provider = provider;
             state.model = model;
         }
+        // `Ui` events are handled in the reader loop where `ctx` is available.
+        TranscriptEvent::Ui { .. } => {}
     }
+}
+
+/// Apply a window-visibility action via egui viewport commands.
+///
+/// Programmatic hide/minimize is reliable; raise+focus on Wayland is
+/// best-effort and compositor-dependent. If focus-on-show is flaky on a given
+/// compositor, a compositor scratchpad binding is the robust fallback.
+fn apply_ui_action(state: &Arc<Mutex<UiState>>, ctx: &egui::Context, action: UiAction) {
+    use egui::ViewportCommand;
+
+    // Resolve `Toggle` against the tracked visibility flag.
+    let show = match action {
+        UiAction::Show => true,
+        UiAction::Hide => false,
+        UiAction::Toggle => !state.lock().map(|s| s.visible).unwrap_or(true),
+    };
+
+    if show {
+        // Restore and raise/focus. `Minimized(false)` is a no-op on Wayland
+        // (no unminimize protocol); `Visible(true)` re-maps where supported;
+        // `Focus` is best-effort and compositor-dependent.
+        ctx.send_viewport_cmd(ViewportCommand::Visible(true));
+        ctx.send_viewport_cmd(ViewportCommand::Minimized(false));
+        ctx.send_viewport_cmd(ViewportCommand::Focus);
+    } else {
+        // Hide. We send both because compositors honor different requests:
+        // GNOME/KDE/X11 honor `Minimized`; `Visible(false)` unmaps where
+        // supported. NOTE: tiling Wayland compositors (Sway, Hyprland, river,
+        // niri) ignore BOTH via winit 0.30 — for those, bind the waystt-ui
+        // window to a compositor scratchpad/special-workspace toggle instead.
+        ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+        ctx.send_viewport_cmd(ViewportCommand::Visible(false));
+    }
+
+    if let Ok(mut state) = state.lock() {
+        state.visible = show;
+    }
+    ctx.request_repaint();
 }
 
 fn update_state(
@@ -292,7 +343,12 @@ fn main() -> eframe::Result {
     };
     let state = Arc::new(Mutex::new(UiState::default()));
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([900.0, 600.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([900.0, 600.0])
+            // Stable Wayland app_id so compositor window rules can match this
+            // window (e.g. Hyprland `windowrule = ..., class:^(waystt-ui)$`).
+            .with_app_id("waystt-ui")
+            .with_always_on_top(),
         ..Default::default()
     };
 
